@@ -31,7 +31,7 @@
             <p id="popup-success" class="popup-success" style="display: none;">
                 Aby zapisać się na zajęcia, skontaktuj się z EnerGym drogą telefoniczną (szczegóły w sekcji "kontakt").
             </p>
-            <a id="contact-button" href="kontakt" style="display: none;">
+            <a id="contact-button" href="?page=kontakt" style="display: none;">
                 <button class="zajecia_button">Kontakt</button>
             </a>
         </div>

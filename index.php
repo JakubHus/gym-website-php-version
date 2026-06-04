@@ -3,7 +3,11 @@
 
     $permit = [
         'home', 'karnety', 'onas', 'kluby', 'bmi',
-        'zajecia', 'kontakt', 'regulamin', 'transakcja'
+        'zajecia', 'kontakt', 'regulamin', 'transakcja', 
+        'rejestracja', 'logowanie', 'profil', 'wylogowanie',
+        'admin', 'admin_user_add', 'admin_user_edit', 'admin_user_delete',
+        'admin_trainer_add', 'admin_trainer_edit', 'admin_trainer_delete',
+        'trening_personalny'
     ];
 
     $page = $_GET['page'] ?? 'home';
@@ -62,6 +66,66 @@
             'title' => 'Panel płatności',
             'css'   => 'transakcja.css',
             'desc'  => 'Kup karnet na siłownię EnerGym online. Bezpieczne płatności BLIK i inne opcje. Wypełnij formularz i zacznij swoją przygodę z fitness już dziś!',
+        ],
+        'rejestracja' => [
+            'title' => 'Rejestracja - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zarejestruj się w EnerGym i dołącz do naszej społeczności fitness. Twórz konto, aby kupować karnety i śledzić swoje postępy. Darmowa rejestracja!',
+        ],
+        'logowanie' => [
+            'title' => 'Logowanie - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zaloguj się do swojego konta EnerGym. Zarządzaj swoimi karnetami, śledź postępy i korzystaj z ekskluywnych benefitów.',
+        ],
+        'profil' => [
+            'title' => 'Mój Profil - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zarządzaj swoim profilem, przeglądaj aktywne karnety i historię transakcji.',
+        ],
+        'trening_personalny' => [
+            'title' => 'Trening personalny - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Poznaj naszych trenerów personalnych EnerGym i umów się na wizytę.',
+        ],
+        'admin' => [
+            'title' => 'Panel Administratora - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Administracja użytkownikami i trenerami EnerGym.',
+        ],
+        'admin_user_add' => [
+            'title' => 'Dodaj użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Dodaj nowego użytkownika do systemu.',
+        ],
+        'admin_user_edit' => [
+            'title' => 'Edytuj użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Edytuj dane użytkownika w systemie.',
+        ],
+        'admin_user_delete' => [
+            'title' => 'Usuń użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Usuń użytkownika z bazy danych.',
+        ],
+        'admin_trainer_add' => [
+            'title' => 'Dodaj trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Dodaj nowego trenera do systemu.',
+        ],
+        'admin_trainer_edit' => [
+            'title' => 'Edytuj trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Edytuj dane trenera w systemie.',
+        ],
+        'admin_trainer_delete' => [
+            'title' => 'Usuń trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Usuń trenera z bazy danych.',
+        ],
+        'wylogowanie' => [
+            'title' => 'Wylogowanie',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Wylogowanie z konta.',
         ],
     ];
 
