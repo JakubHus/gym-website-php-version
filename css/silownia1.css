@@ -1,0 +1,255 @@
+body {
+    margin: 0;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    background-color: #b45ed6;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.navbar {
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 10px;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+.navbar ul {
+    list-style: none;
+    margin: 0;
+    padding: 5px 5px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.navbar li {
+    margin: 0 15px;
+}
+
+.navbar a {
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 25px;
+    transition: transform 0.3s ease, color 0.3s ease;
+    display: flex;
+}
+
+.navbar a:hover {
+    color: #7a17cb;
+    transform: scale(1.2);
+}
+
+.navbar img:hover {
+    transform: scale(1.7);
+}
+
+.navbar img {
+    display: block; 
+    width: 100%; 
+    height: 100%;  
+    object-fit: cover; 
+}
+
+.navbar a:not(:first-child) {
+    color: #fff;
+    font-size: 16px;
+    transition: color 0.3s;
+}
+
+.main_container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+}
+
+.main_container .main_image {
+    width: 2500px;
+    height: 1100px;
+    object-fit: cover;
+    border: 5px solid black;
+    border-radius: 10px;
+}
+
+.overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: white;
+}
+
+.overlay-text {
+    font-size: clamp(3rem, 10vw, 25rem);
+    font-weight: bold;
+    margin: 0;
+    opacity: 0.8;
+    text-align: center;
+}
+
+footer {
+    background-color: #000000;
+    color: white;
+    text-align: center;
+    padding: 20px 10px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer-content p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+footer p {
+    font-size: 16px;
+}
+
+.opinion_section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 50px 0;
+    position: relative;
+}
+
+.opinion_container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    overflow: hidden;
+}
+
+.opinion_card {
+    display: none;
+}
+
+.opinion_card:nth-child(1),
+.opinion_card:nth-child(2) {
+    display: block;
+}
+
+.opinion_card {
+    text-align: center;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, #f8f9fa, #dcdde1);
+    margin: 10px;
+    box-sizing: border-box;
+    border: 2px solid #982cc1;
+    border-radius: 15px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.opinion_card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.opinion_text {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.customer_name {
+    font-weight: bold;
+    font-size: 14px;
+    color: #555;
+}
+
+.arrow {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 10px;
+    transition: transform 0.2s ease;
+}
+
+.arrow:hover {
+    transform: scale(1.2);
+}
+
+.logo-banner {
+    background-color: #000;
+    text-align: center;
+    padding: 20px 0;
+    margin-top: 20px;
+}
+
+.logo-img {
+    max-height: 80px;
+    width: auto;
+}
+
+@media (max-width: 1200px) {
+    .main_container .main_image {
+        width: 100%;
+        height: auto;
+    }
+    .navbar ul {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .overlay-text {
+        font-size: clamp(3rem, 8vw, 10rem);
+    }
+    .navbar a {
+        font-size: 14px;
+    }
+    .navbar img {
+        height: 30px;
+    }
+    .opinion_section {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .arrow {
+        font-size: 1.5rem;
+    }
+    .opinion_container {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar ul {
+        flex-direction: column;
+        align-items: center;
+    }
+    .navbar li {
+        margin: 10px 0;
+    }
+    .logo-banner {
+        padding: 10px 0;
+    }
+    .logo-img {
+        max-height: 50px;
+    }
+    footer p {
+        font-size: 12px;
+    }
+    .opinion_container {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+}
