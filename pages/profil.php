@@ -55,49 +55,59 @@ if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $profile_message = "PESEL jest nieprawidłowy. Sprawdź sumę kontrolną i długość 11 cyfr.";
         $profile_message_type = "error";
     } else {
-        $updatedCols = ['imie', 'nazwisko', 'mail'];
-        foreach ($optionalCols as $col) {
-            $check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE '$col'");
-            if ($check && mysqli_num_rows($check) > 0) {
-                $updatedCols[] = $col;
-            }
-        }
+        $mail_input = trim($_POST['mail'] ?? '');
+        $mail_safe = mysqli_real_escape_string($conn, $mail_input);
+        $email_check_sql = "SELECT id FROM users WHERE mail = '$mail_safe' AND id != '$user_id'";
+        $email_check_result = mysqli_query($conn, $email_check_sql);
 
-        // Obliczanie BMI automatycznie przy podaniu wagi i wzrostu
-        $waga_input = trim($_POST['waga'] ?? '');
-        $wzrost_input = trim($_POST['wzrost'] ?? '');
-        if ($waga_input !== '' && $wzrost_input !== '' && is_numeric($waga_input) && is_numeric($wzrost_input) && (float)$wzrost_input > 0) {
-            $_POST['bmi'] = round((float)$waga_input / (((float)$wzrost_input / 100) ** 2), 1);
-        }
-
-        $updates = [];
-        foreach ($updatedCols as $col) {
-            if ($col === 'role' || $col === 'id') {
-                continue;
+        if ($email_check_result && mysqli_num_rows($email_check_result) > 0) {
+            $profile_message = "Użytkownik z takim adresem e-mail już istnieje!";
+            $profile_message_type = "error";
+        } else {
+            $updatedCols = ['imie', 'nazwisko', 'mail'];
+            foreach ($optionalCols as $col) {
+                $check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE '$col'");
+                if ($check && mysqli_num_rows($check) > 0) {
+                    $updatedCols[] = $col;
+                }
             }
 
-            $value = trim($_POST[$col] ?? '');
-            $escaped = mysqli_real_escape_string($conn, $value);
-
-            if ($escaped === '') {
-                $updates[] = "$col = NULL";
-            } else {
-                $updates[] = "$col = '$escaped'";
+            // Obliczanie BMI automatycznie przy podaniu wagi i wzrostu
+            $waga_input = trim($_POST['waga'] ?? '');
+            $wzrost_input = trim($_POST['wzrost'] ?? '');
+            if ($waga_input !== '' && $wzrost_input !== '' && is_numeric($waga_input) && is_numeric($wzrost_input) && (float)$wzrost_input > 0) {
+                $_POST['bmi'] = round((float)$waga_input / (((float)$wzrost_input / 100) ** 2), 1);
             }
 
-            if ($col === 'imie') {
-                $_SESSION['imie'] = $value;
-            }
-        }
+            $updates = [];
+            foreach ($updatedCols as $col) {
+                if ($col === 'role' || $col === 'id') {
+                    continue;
+                }
 
-        if (!empty($updates)) {
-            $sqlUpdate = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = '$user_id'";
-            if (mysqli_query($conn, $sqlUpdate)) {
-                $profile_message = "Dane w profilu zostały zapisane.";
-                $profile_message_type = "success";
-            } else {
-                $profile_message = "Błąd podczas zapisu: " . mysqli_error($conn);
-                $profile_message_type = "error";
+                $value = trim($_POST[$col] ?? '');
+                $escaped = mysqli_real_escape_string($conn, $value);
+
+                if ($escaped === '') {
+                    $updates[] = "$col = NULL";
+                } else {
+                    $updates[] = "$col = '$escaped'";
+                }
+
+                if ($col === 'imie') {
+                    $_SESSION['imie'] = $value;
+                }
+            }
+
+            if (!empty($updates)) {
+                $sqlUpdate = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = '$user_id'";
+                if (mysqli_query($conn, $sqlUpdate)) {
+                    $profile_message = "Dane w profilu zostały zapisane.";
+                    $profile_message_type = "success";
+                } else {
+                    $profile_message = "Błąd podczas zapisu: " . mysqli_error($conn);
+                    $profile_message_type = "error";
+                }
             }
         }
     }

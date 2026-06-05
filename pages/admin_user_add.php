@@ -26,16 +26,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $imie_safe = mysqli_real_escape_string($conn, $values['imie']);
         $nazwisko_safe = mysqli_real_escape_string($conn, $values['nazwisko']);
         $mail_safe = mysqli_real_escape_string($conn, $values['mail']);
-        $haslo_safe = password_hash($values['haslo'], PASSWORD_DEFAULT);
-        $role_safe = (int)$values['role'];
-
-        $sql = "INSERT INTO users (imie,nazwisko,mail,haslo,role) VALUES ('{$imie_safe}','{$nazwisko_safe}','{$mail_safe}','{$haslo_safe}',{$role_safe})";
-
-        if (mysqli_query($conn, $sql)) {
-            header("Location: ?page=admin&msg=user_added");
-            exit();
+        
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe'";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = 'Użytkownik z takim adresem e-mail już istnieje!';
         } else {
-            $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+            $haslo_safe = password_hash($values['haslo'], PASSWORD_DEFAULT);
+            $role_safe = (int)$values['role'];
+
+            $sql = "INSERT INTO users (imie,nazwisko,mail,haslo,role) VALUES ('{$imie_safe}','{$nazwisko_safe}','{$mail_safe}','{$haslo_safe}',{$role_safe})";
+
+            if (mysqli_query($conn, $sql)) {
+                header("Location: ?page=admin&msg=user_added");
+                exit();
+            } else {
+                $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+            }
         }
     }
 }

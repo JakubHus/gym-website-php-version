@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <style>
-    .admin-form { max-width: 650px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; }
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
     .admin-form h2 { margin-bottom: 20px; }
     .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; }
     .admin-form input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; margin-bottom: 15px; box-sizing: border-box; }

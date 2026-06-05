@@ -50,7 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($values['pesel'] !== '' && !is_valid_pesel($values['pesel'])) {
         $message = 'PESEL jest nieprawidłowy. Sprawdź sumę kontrolną i długość 11 cyfr.';
     } else {
-        if ($values['waga'] !== '' && $values['wzrost'] !== '' && is_numeric($values['waga']) && is_numeric($values['wzrost']) && (float)$values['wzrost'] > 0) {
+        $mail_safe = mysqli_real_escape_string($conn, $values['mail']);
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe' AND id != $edit_id";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = 'Użytkownik z takim adresem e-mail już istnieje!';
+        } else {
+            if ($values['waga'] !== '' && $values['wzrost'] !== '' && is_numeric($values['waga']) && is_numeric($values['wzrost']) && (float)$values['wzrost'] > 0) {
             $values['bmi'] = round((float)$values['waga'] / (((float)$values['wzrost'] / 100) ** 2), 1);
         } else {
             $values['bmi'] = '';
@@ -89,10 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+}
 ?>
 
 <style>
-    .admin-form { max-width: 750px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; }
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
     .admin-form h2 { margin-bottom: 20px; }
     .admin-form .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
     .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; color: #333; }

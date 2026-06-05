@@ -20,17 +20,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $nazwisko_safe = mysqli_real_escape_string($conn, $nazwisko);
         $mail_safe = mysqli_real_escape_string($conn, $mail);
 
-        $sql = "INSERT INTO users (imie, nazwisko, mail, haslo) VALUES ('$imie_safe', '$nazwisko_safe', '$mail_safe', '$hashed_password')";
-
-        if (mysqli_query($conn, $sql)) {
-            header("Location: ?page=logowanie&msg=registered");
-            exit();
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe'";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = "Konto z takim adresem e-mail już istnieje!";
         } else {
-            $errno = mysqli_errno($conn);
-            if ($errno === 1062) {
-                $message = "Konto z takim adresem e-mail już istnieje!";
+            $sql = "INSERT INTO users (imie, nazwisko, mail, haslo) VALUES ('$imie_safe', '$nazwisko_safe', '$mail_safe', '$hashed_password')";
+
+            if (mysqli_query($conn, $sql)) {
+                header("Location: ?page=logowanie&msg=registered");
+                exit();
             } else {
-                $message = "Wystąpił błąd bazy danych. Spróbuj ponownie.";
+                $errno = mysqli_errno($conn);
+                if ($errno === 1062) {
+                    $message = "Konto z takim adresem e-mail już istnieje!";
+                } else {
+                    $message = "Wystąpił błąd bazy danych. Spróbuj ponownie.";
+                }
             }
         }
     }
@@ -180,17 +187,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
             <div class="form-group">
                 <label for="imie">✨ Imię</label>
-                <input type="text" id="imie" name="imie" placeholder="Wpisz swoje imię" required>
+                <input type="text" id="imie" name="imie" placeholder="Wpisz swoje imię" value="<?php echo htmlspecialchars($_POST['imie'] ?? ''); ?>" required>
             </div>
 
             <div class="form-group">
                 <label for="nazwisko">✨ Nazwisko</label>
-                <input type="text" id="nazwisko" name="nazwisko" placeholder="Wpisz swoje nazwisko" required>
+                <input type="text" id="nazwisko" name="nazwisko" placeholder="Wpisz swoje nazwisko" value="<?php echo htmlspecialchars($_POST['nazwisko'] ?? ''); ?>" required>
             </div>
 
             <div class="form-group">
                 <label for="mail">📧 Adres E-mail</label>
-                <input type="email" id="mail" name="mail" placeholder="Wpisz swój e-mail" required>
+                <input type="email" id="mail" name="mail" placeholder="Wpisz swój e-mail" value="<?php echo htmlspecialchars($_POST['mail'] ?? ''); ?>" required>
             </div>
 
             <div class="form-group">
