@@ -1,0 +1,3242 @@
+--- TU są pliki w pages (.php) ---
+
+admin_trainer_add.php
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$message = '';
+$values = ['imie' => '', 'nazwisko' => '', 'specjalizacja' => '', 'cena' => '', 'numer_telefonu' => ''];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach ($values as $key => $_) {
+        $values[$key] = trim($_POST[$key] ?? '');
+    }
+
+    if ($values['imie'] === '' || $values['nazwisko'] === '' || $values['specjalizacja'] === '' || $values['cena'] === '' || $values['numer_telefonu'] === '') {
+        $message = 'Wszystkie pola są wymagane!';
+    } elseif (!is_numeric($values['cena'])) {
+        $message = 'Cena musi być liczbą.';
+    } else {
+        $imie_safe = mysqli_real_escape_string($conn, $values['imie']);
+        $nazwisko_safe = mysqli_real_escape_string($conn, $values['nazwisko']);
+        $spec_safe = mysqli_real_escape_string($conn, $values['specjalizacja']);
+        $telefon_safe = mysqli_real_escape_string($conn, $values['numer_telefonu']);
+        $cena_safe = number_format((float)$values['cena'], 2, '.', '');
+
+        $sql = "INSERT INTO trenerzy (imie, nazwisko, specjalizacja, numer_telefonu, cena) VALUES ('{$imie_safe}', '{$nazwisko_safe}', '{$spec_safe}', '{$telefon_safe}', '{$cena_safe}')";
+        if (mysqli_query($conn, $sql)) {
+            header('Location: ?page=admin&msg=trainer_added');
+            exit();
+        } else {
+            $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+        }
+    }
+}
+?>
+
+<style>
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
+    .admin-form h2 { margin-bottom: 20px; }
+    .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; }
+    .admin-form input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; margin-bottom: 15px; box-sizing: border-box; }
+    .admin-form .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .admin-form button { padding: 12px 20px; background: #4a5ed6; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+    .admin-form .cancel-link { padding: 12px 20px; background: #eee; color: #333; text-decoration: none; border-radius: 10px; }
+    .admin-form .message { margin-bottom: 20px; padding: 12px 15px; border-radius: 10px; background: #ffe7e7; color: #8b2323; border: 1px solid #f4c2c2; }
+</style>
+
+<div class="admin-form">
+    <h2>Dodaj nowego trenera</h2>
+    <?php if ($message !== ''): ?>
+        <div class="message"><?php echo htmlspecialchars($message); ?></div>
+    <?php endif; ?>
+    <form method="POST" action="">
+        <label>Imię</label>
+        <input type="text" name="imie" value="<?php echo htmlspecialchars($values['imie']); ?>" required>
+
+        <label>Nazwisko</label>
+        <input type="text" name="nazwisko" value="<?php echo htmlspecialchars($values['nazwisko']); ?>" required>
+
+        <label>Specjalizacja</label>
+        <input type="text" name="specjalizacja" value="<?php echo htmlspecialchars($values['specjalizacja']); ?>" required>
+
+        <label>Numer telefonu</label>
+        <input type="text" name="numer_telefonu" value="<?php echo htmlspecialchars($values['numer_telefonu']); ?>" required>
+
+        <label>Cena</label>
+        <input type="number" step="5" min="0" name="cena" value="<?php echo htmlspecialchars($values['cena']); ?>" required>
+
+        <div class="actions">
+            <button type="submit">Dodaj trenera</button>
+            <a class="cancel-link" href="?page=admin">Anuluj</a>
+        </div>
+    </form>
+</div>
+
+---
+admin_trainer_delete.php
+
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$delete_id = (int)($_GET['id'] ?? 0);
+if ($delete_id === 0) {
+    header('Location: ?page=admin');
+    exit();
+}
+
+$sql = "DELETE FROM trenerzy WHERE id = $delete_id";
+if (mysqli_query($conn, $sql)) {
+    header('Location: ?page=admin&msg=trainer_deleted');
+    exit();
+} else {
+    header('Location: ?page=admin&msg=db_error');
+    exit();
+}
+
+
+
+---admin_trainer_edit.php
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$edit_id = (int)($_GET['id'] ?? 0);
+if ($edit_id <= 0) {
+    header("Location: ?page=admin");
+    exit();
+}
+
+$message = '';
+$values = ['imie' => '', 'nazwisko' => '', 'specjalizacja' => '', 'cena' => '', 'numer_telefonu' => ''];
+
+$result = mysqli_query($conn, "SELECT * FROM trenerzy WHERE id = $edit_id");
+if ($result && mysqli_num_rows($result) === 1) {
+    $row = mysqli_fetch_assoc($result);
+    $values = array_merge($values, $row);
+    $values['numer_telefonu'] = $row['numer_telefonu'] ?? '';
+} else {
+    header("Location: ?page=admin");
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach ($values as $key => $_) {
+        $values[$key] = trim($_POST[$key] ?? '');
+    }
+
+    if ($values['imie'] === '' || $values['nazwisko'] === '' || $values['specjalizacja'] === '' || $values['cena'] === '' || $values['numer_telefonu'] === '') {
+        $message = 'Wszystkie pola są wymagane!';
+    } elseif (!is_numeric($values['cena'])) {
+        $message = 'Cena musi być liczbą.';
+    } else {
+        $imie_safe = mysqli_real_escape_string($conn, $values['imie']);
+        $nazwisko_safe = mysqli_real_escape_string($conn, $values['nazwisko']);
+        $spec_safe = mysqli_real_escape_string($conn, $values['specjalizacja']);
+        $telefon_safe = mysqli_real_escape_string($conn, $values['numer_telefonu']);
+        $cena_safe = number_format((float)$values['cena'], 2, '.', '');
+
+        $sql = "UPDATE trenerzy SET imie='{$imie_safe}', nazwisko='{$nazwisko_safe}', specjalizacja='{$spec_safe}', numer_telefonu='{$telefon_safe}', cena='{$cena_safe}' WHERE id = $edit_id";
+        if (mysqli_query($conn, $sql)) {
+            header('Location: ?page=admin&msg=trainer_updated');
+            exit();
+        } else {
+            $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+        }
+    }
+}
+?>
+
+<style>
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
+    .admin-form h2 { margin-bottom: 20px; }
+    .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; }
+    .admin-form input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; margin-bottom: 15px; box-sizing: border-box; }
+    .admin-form .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .admin-form button { padding: 12px 20px; background: #4a5ed6; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+    .admin-form .cancel-link { padding: 12px 20px; background: #eee; color: #333; text-decoration: none; border-radius: 10px; }
+    .admin-form .message { margin-bottom: 20px; padding: 12px 15px; border-radius: 10px; background: #ffe7e7; color: #8b2323; border: 1px solid #f4c2c2; }
+</style>
+
+<div class="admin-form">
+    <h2>Edytuj trenera: <?php echo htmlspecialchars($values['imie'] . ' ' . $values['nazwisko']); ?></h2>
+    <?php if ($message !== ''): ?>
+        <div class="message"><?php echo htmlspecialchars($message); ?></div>
+    <?php endif; ?>
+    <form method="POST" action="">
+        <label>Imię</label>
+        <input type="text" name="imie" value="<?php echo htmlspecialchars($values['imie']); ?>" required>
+
+        <label>Nazwisko</label>
+        <input type="text" name="nazwisko" value="<?php echo htmlspecialchars($values['nazwisko']); ?>" required>
+
+        <label>Specjalizacja</label>
+        <input type="text" name="specjalizacja" value="<?php echo htmlspecialchars($values['specjalizacja']); ?>" required>
+
+        <label>Numer telefonu</label>
+        <input type="text" name="numer_telefonu" value="<?php echo htmlspecialchars($values['numer_telefonu']); ?>" required>
+
+        <label>Cena</label>
+        <input type="number" step="5" min="0" name="cena" value="<?php echo htmlspecialchars($values['cena']); ?>" required>
+
+        <div class="actions">
+            <button type="submit">Zapisz zmiany</button>
+            <a class="cancel-link" href="?page=admin">Anuluj</a>
+        </div>
+    </form>
+</div>
+
+
+admin_user_add.php --- 
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$message = '';
+$values = [
+    'imie' => '',
+    'nazwisko' => '',
+    'mail' => '',
+    'haslo' => '',
+    'role' => 0,
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach ($values as $key => $_) {
+        if (isset($_POST[$key])) {
+            $values[$key] = trim($_POST[$key]);
+        }
+    }
+
+    if ($values['imie'] === '' || $values['nazwisko'] === '' || $values['mail'] === '' || $values['haslo'] === '' || !in_array($values['role'], ['0', '1'], true)) {
+        $message = 'Proszę wypełnić obowiązkowe pola: imię, nazwisko, e-mail, hasło i rola.';
+    } else {
+        $imie_safe = mysqli_real_escape_string($conn, $values['imie']);
+        $nazwisko_safe = mysqli_real_escape_string($conn, $values['nazwisko']);
+        $mail_safe = mysqli_real_escape_string($conn, $values['mail']);
+        
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe'";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = 'Użytkownik z takim adresem e-mail już istnieje!';
+        } else {
+            $haslo_safe = password_hash($values['haslo'], PASSWORD_DEFAULT);
+            $role_safe = (int)$values['role'];
+
+            $sql = "INSERT INTO users (imie,nazwisko,mail,haslo,role) VALUES ('{$imie_safe}','{$nazwisko_safe}','{$mail_safe}','{$haslo_safe}',{$role_safe})";
+
+            if (mysqli_query($conn, $sql)) {
+                header("Location: ?page=admin&msg=user_added");
+                exit();
+            } else {
+                $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+            }
+        }
+    }
+}
+?>
+
+<style>
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
+    .admin-form h2 { margin-bottom: 20px; }
+    .admin-form .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+    .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; color: #333; }
+    .admin-form input, .admin-form select, .admin-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
+    .admin-form textarea { min-height: 100px; resize: vertical; }
+    .admin-form .actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .admin-form button { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; background: #2d8f29; color: white; font-weight: bold; }
+    .admin-form .cancel-link { display: inline-block; padding: 12px 20px; background: #eee; color: #333; text-decoration: none; border-radius: 10px; }
+    .admin-form .message { margin-bottom: 20px; padding: 12px 15px; border-radius: 10px; }
+    .admin-form .message.error { background: #ffe7e7; color: #8b2323; border: 1px solid #f4c2c2; }
+</style>
+
+<div class="admin-form">
+    <h2>Dodaj nowego użytkownika</h2>
+    <?php if ($message !== ''): ?>
+        <div class="message error"><?php echo htmlspecialchars($message); ?></div>
+    <?php endif; ?>
+    <form method="POST" action="">
+        <div class="row">
+            <div>
+                <label>Imię</label>
+                <input type="text" name="imie" value="<?php echo htmlspecialchars($values['imie']); ?>" required>
+            </div>
+            <div>
+                <label>Nazwisko</label>
+                <input type="text" name="nazwisko" value="<?php echo htmlspecialchars($values['nazwisko']); ?>" required>
+            </div>
+            <div>
+                <label>E-mail</label>
+                <input type="email" name="mail" value="<?php echo htmlspecialchars($values['mail']); ?>" required>
+            </div>
+            <div>
+                <label>Hasło</label>
+                <input type="password" name="haslo" value="" required>
+            </div>
+            <div>
+                <label>Rola</label>
+                <select name="role">
+                    <option value="0" <?php echo $values['role'] == 0 ? 'selected' : ''; ?>>Użytkownik</option>
+                    <option value="1" <?php echo $values['role'] == 1 ? 'selected' : ''; ?>>Administrator</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 14px; flex-wrap: wrap;">
+            <button type="submit">Utwórz użytkownika</button>
+            <a class="cancel-link" href="?page=admin">Anuluj</a>
+        </div>
+    </form>
+</div>
+
+
+admin_user_delete.php ---- 
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$delete_id = (int)($_GET['id'] ?? 0);
+$current_admin = (int)$_SESSION['user_id'];
+
+if ($delete_id === 0) {
+    header('Location: ?page=admin');
+    exit();
+}
+
+if ($delete_id === $current_admin) {
+    header('Location: ?page=admin&msg=delete_self_error');
+    exit();
+}
+
+$sql = "DELETE FROM users WHERE id = $delete_id";
+if (mysqli_query($conn, $sql)) {
+    header('Location: ?page=admin&msg=user_deleted');
+    exit();
+} else {
+    header('Location: ?page=admin&msg=db_error');
+    exit();
+}
+
+
+admin_user_edit.php -----
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$edit_id = (int)($_GET['id'] ?? 0);
+if ($edit_id <= 0) {
+    header("Location: ?page=admin");
+    exit();
+}
+
+$message = '';
+$user = null;
+$values = [];
+
+function is_valid_pesel($pesel) {
+    if (!preg_match('/^[0-9]{11}$/', $pesel)) {
+        return false;
+    }
+    $digits = str_split($pesel);
+    $weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+    $sum = 0;
+    foreach ($weights as $index => $weight) {
+        $sum += $weight * (int)$digits[$index];
+    }
+    $control = (10 - ($sum % 10)) % 10;
+    return $control === (int)$digits[10];
+}
+
+$result = mysqli_query($conn, "SELECT * FROM users WHERE id = $edit_id");
+if ($result && mysqli_num_rows($result) === 1) {
+    $user = mysqli_fetch_assoc($result);
+    foreach ($user as $key => $val) {
+        $values[$key] = $val;
+    }
+} else {
+    header("Location: ?page=admin");
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $updatedFields = ['imie','nazwisko','mail','role','pesel','numer_telefonu','miasto','ulica','numer_domu','numer_lokalu','kod_pocztowy','opinia','karnet_typ','karnet_zakup','karnet_koniec','waga','wzrost','bmi'];
+    foreach ($updatedFields as $field) {
+        $values[$field] = trim($_POST[$field] ?? '');
+    }
+
+    if ($values['imie'] === '' || $values['nazwisko'] === '' || $values['mail'] === '' || !in_array($values['role'], ['0', '1'], true)) {
+        $message = 'Proszę wypełnić obowiązkowe pola: imię, nazwisko, e-mail i rola.';
+    } elseif ($values['pesel'] !== '' && !is_valid_pesel($values['pesel'])) {
+        $message = 'PESEL jest nieprawidłowy. Sprawdź sumę kontrolną i długość 11 cyfr.';
+    } else {
+        $mail_safe = mysqli_real_escape_string($conn, $values['mail']);
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe' AND id != $edit_id";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = 'Użytkownik z takim adresem e-mail już istnieje!';
+        } else {
+            if ($values['waga'] !== '' && $values['wzrost'] !== '' && is_numeric($values['waga']) && is_numeric($values['wzrost']) && (float)$values['wzrost'] > 0) {
+            $values['bmi'] = round((float)$values['waga'] / (((float)$values['wzrost'] / 100) ** 2), 1);
+        } else {
+            $values['bmi'] = '';
+        }
+
+        $parts = [];
+        $parts[] = "imie='" . mysqli_real_escape_string($conn, $values['imie']) . "'";
+        $parts[] = "nazwisko='" . mysqli_real_escape_string($conn, $values['nazwisko']) . "'";
+        $parts[] = "mail='" . mysqli_real_escape_string($conn, $values['mail']) . "'";
+        $parts[] = "role=" . ((int)$values['role']);
+        $parts[] = "pesel=" . ($values['pesel'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['pesel']) . "'" : 'NULL');
+        $parts[] = "numer_telefonu=" . ($values['numer_telefonu'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['numer_telefonu']) . "'" : 'NULL');
+        $parts[] = "miasto=" . ($values['miasto'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['miasto']) . "'" : 'NULL');
+        $parts[] = "ulica=" . ($values['ulica'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['ulica']) . "'" : 'NULL');
+        $parts[] = "numer_domu=" . ($values['numer_domu'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['numer_domu']) . "'" : 'NULL');
+        $parts[] = "numer_lokalu=" . ($values['numer_lokalu'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['numer_lokalu']) . "'" : 'NULL');
+        $parts[] = "kod_pocztowy=" . ($values['kod_pocztowy'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['kod_pocztowy']) . "'" : 'NULL');
+        $parts[] = "opinia=" . ($values['opinia'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['opinia']) . "'" : 'NULL');
+        $parts[] = "karnet_typ=" . ($values['karnet_typ'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['karnet_typ']) . "'" : 'NULL');
+        $parts[] = "karnet_zakup=" . ($values['karnet_zakup'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['karnet_zakup']) . "'" : 'NULL');
+        $parts[] = "karnet_koniec=" . ($values['karnet_koniec'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['karnet_koniec']) . "'" : 'NULL');
+        $parts[] = "waga=" . ($values['waga'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['waga']) . "'" : 'NULL');
+        $parts[] = "wzrost=" . ($values['wzrost'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['wzrost']) . "'" : 'NULL');
+        $parts[] = "bmi=" . ($values['bmi'] !== '' ? "'" . mysqli_real_escape_string($conn, $values['bmi']) . "'" : 'NULL');
+
+        if (!empty($_POST['haslo'])) {
+            $parts[] = "haslo='" . password_hash($_POST['haslo'], PASSWORD_DEFAULT) . "'";
+        }
+
+        $sql = "UPDATE users SET " . implode(', ', $parts) . " WHERE id = $edit_id";
+        if (mysqli_query($conn, $sql)) {
+            header("Location: ?page=admin&msg=user_updated");
+            exit();
+        } else {
+            $message = 'Wystąpił problem z bazą danych: ' . mysqli_error($conn);
+        }
+    }
+}
+}
+?>
+
+<style>
+    .admin-form { width: 33%; min-width: 320px; margin: 40px auto; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
+    .admin-form h2 { margin-bottom: 20px; }
+    .admin-form .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+    .admin-form label { display: block; margin-bottom: 6px; font-weight: bold; color: #333; }
+    .admin-form input, .admin-form select, .admin-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
+    .admin-form textarea { min-height: 100px; resize: vertical; }
+    .admin-form .actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .admin-form button { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; background: #2d8f29; color: white; font-weight: bold; }
+    .admin-form .cancel-link { display: inline-block; padding: 12px 20px; background: #eee; color: #333; text-decoration: none; border-radius: 10px; }
+    .admin-form .message { margin-bottom: 20px; padding: 12px 15px; border-radius: 10px; }
+    .admin-form .message.error { background: #ffe7e7; color: #8b2323; border: 1px solid #f4c2c2; }
+</style>
+
+<div class="admin-form">
+    <h2>Edytuj użytkownika: <?php echo htmlspecialchars($values['imie'] . ' ' . $values['nazwisko']); ?></h2>
+    <?php if ($message !== ''): ?>
+        <div class="message error"><?php echo htmlspecialchars($message); ?></div>
+    <?php endif; ?>
+    <form method="POST" action="">
+        <div class="row">
+            <div>
+                <label>Imię</label>
+                <input type="text" name="imie" value="<?php echo htmlspecialchars($values['imie']); ?>" required>
+            </div>
+            <div>
+                <label>Nazwisko</label>
+                <input type="text" name="nazwisko" value="<?php echo htmlspecialchars($values['nazwisko']); ?>" required>
+            </div>
+            <div>
+                <label>E-mail</label>
+                <input type="email" name="mail" value="<?php echo htmlspecialchars($values['mail']); ?>" required>
+            </div>
+            <div>
+                <label>Hasło (zostaw puste, jeśli bez zmian)</label>
+                <input type="password" name="haslo" value="">
+            </div>
+            <div>
+                <label>Rola</label>
+                <select name="role">
+                    <option value="0" <?php echo $values['role'] == 0 ? 'selected' : ''; ?>>Użytkownik</option>
+                    <option value="1" <?php echo $values['role'] == 1 ? 'selected' : ''; ?>>Administrator</option>
+                </select>
+            </div>
+            <div>
+                <label>PESEL</label>
+                <input type="text" name="pesel" value="<?php echo htmlspecialchars($values['pesel']); ?>">
+            </div>
+            <div>
+                <label>Numer telefonu</label>
+                <input type="text" name="numer_telefonu" value="<?php echo htmlspecialchars($values['numer_telefonu']); ?>">
+            </div>
+            <div>
+                <label>Miasto</label>
+                <input type="text" name="miasto" value="<?php echo htmlspecialchars($values['miasto']); ?>">
+            </div>
+            <div>
+                <label>Ulica</label>
+                <input type="text" name="ulica" value="<?php echo htmlspecialchars($values['ulica']); ?>">
+            </div>
+            <div>
+                <label>Numer domu</label>
+                <input type="text" name="numer_domu" value="<?php echo htmlspecialchars($values['numer_domu']); ?>">
+            </div>
+            <div>
+                <label>Numer lokalu</label>
+                <input type="text" name="numer_lokalu" value="<?php echo htmlspecialchars($values['numer_lokalu']); ?>">
+            </div>
+            <div>
+                <label>Kod pocztowy</label>
+                <input type="text" name="kod_pocztowy" value="<?php echo htmlspecialchars($values['kod_pocztowy']); ?>">
+            </div>
+            <div>
+                <label>Typ karnetu</label>
+                <input type="text" name="karnet_typ" value="<?php echo htmlspecialchars($values['karnet_typ']); ?>">
+            </div>
+            <div>
+                <label>Data zakupu karnetu</label>
+                <input type="date" name="karnet_zakup" value="<?php echo htmlspecialchars($values['karnet_zakup']); ?>">
+            </div>
+            <div>
+                <label>Data końca karnetu</label>
+                <input type="date" name="karnet_koniec" value="<?php echo htmlspecialchars($values['karnet_koniec']); ?>">
+            </div>
+            <div>
+                <label>Waga (kg)</label>
+                <input id="waga" type="number" step="0.1" name="waga" value="<?php echo htmlspecialchars($values['waga']); ?>">
+            </div>
+            <div>
+                <label>Wzrost (cm)</label>
+                <input id="wzrost" type="number" step="0.1" name="wzrost" value="<?php echo htmlspecialchars($values['wzrost']); ?>">
+            </div>
+            <div>
+                <label>BMI</label>
+                <input id="bmi" type="number" step="0.1" name="bmi" value="<?php echo htmlspecialchars($values['bmi']); ?>" readonly>
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <label>Opinia</label>
+                <textarea name="opinia"><?php echo htmlspecialchars($values['opinia']); ?></textarea>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 14px; flex-wrap: wrap;">
+            <button type="submit">Zapisz zmiany</button>
+            <a class="cancel-link" href="?page=admin">Anuluj</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    function calculateBmi(weight, height) {
+        if (!weight || !height || height <= 0) return '';
+        return Math.round((weight / ((height / 100) ** 2)) * 10) / 10;
+    }
+
+    const editWeight = document.getElementById('waga');
+    const editHeight = document.getElementById('wzrost');
+    const editBmi = document.getElementById('bmi');
+
+    if (editWeight && editHeight && editBmi) {
+        const updateEditBmi = () => {
+            const bmiValue = calculateBmi(parseFloat(editWeight.value), parseFloat(editHeight.value));
+            editBmi.value = bmiValue !== '' ? bmiValue.toFixed(1) : '';
+        };
+        editWeight.addEventListener('input', updateEditBmi);
+        editHeight.addEventListener('input', updateEditBmi);
+        updateEditBmi();
+    }
+</script>
+
+
+
+
+admin.php ----
+
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$msg_html = '';
+if (isset($_GET['msg'])) {
+    switch ($_GET['msg']) {
+        case 'user_added':
+            $msg_html = '<div class="admin-alert success">✅ Użytkownik został pomyślnie dodany.</div>';
+            break;
+        case 'user_updated':
+            $msg_html = '<div class="admin-alert success">✅ Dane użytkownika zostały zaktualizowane.</div>';
+            break;
+        case 'user_deleted':
+            $msg_html = '<div class="admin-alert success">✅ Użytkownik został usunięty.</div>';
+            break;
+        case 'trainer_added':
+            $msg_html = '<div class="admin-alert success">✅ Trener został dodany.</div>';
+            break;
+        case 'trainer_updated':
+            $msg_html = '<div class="admin-alert success">✅ Dane trenera zostały zaktualizowane.</div>';
+            break;
+        case 'trainer_deleted':
+            $msg_html = '<div class="admin-alert success">✅ Trener został usunięty.</div>';
+            break;
+        case 'db_error':
+            $msg_html = '<div class="admin-alert error">⛔ Wystąpił błąd bazy danych.</div>';
+            break;
+        case 'delete_self_error':
+            $msg_html = '<div class="admin-alert error">⛔ Nie możesz usunąć własnego konta administratora!</div>';
+            break;
+    }
+}
+
+$userResult = mysqli_query($conn, "SELECT id, imie, nazwisko, mail, role FROM users ORDER BY nazwisko ASC, imie ASC");
+$trainerResult = mysqli_query($conn, "SHOW TABLES LIKE 'trenerzy'");
+$trainers = [];
+$trainerTableExists = $trainerResult && mysqli_num_rows($trainerResult) > 0;
+if ($trainerTableExists) {
+    $trainerQuery = mysqli_query($conn, "SELECT id, imie, nazwisko, specjalizacja, numer_telefonu, cena FROM trenerzy ORDER BY nazwisko ASC, imie ASC");
+    if ($trainerQuery) {
+        while ($row = mysqli_fetch_assoc($trainerQuery)) {
+            $trainers[] = $row;
+        }
+    }
+}
+?>
+
+<style>
+    .admin-page { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    .admin-alert { padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; }
+    .admin-alert.success { background: #e6ffed; color: #1d6b2e; border: 1px solid #95d7a4; }
+    .admin-alert.error { background: #ffe7e7; color: #8b2323; border: 1px solid #f0a2a2; }
+    .admin-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 25px; }
+    .admin-actions a { padding: 12px 18px; border-radius: 10px; text-decoration: none; color: white; font-weight: bold; }
+    .btn-add-user { background: #2d8f29; }
+    .btn-add-trainer { background: #4a5ed6; }
+    .admin-section { margin-bottom: 40px; }
+    .admin-section h2 { margin-bottom: 15px; color: #333; font-size: 26px; }
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; }
+    .admin-table th,
+    .admin-table td { padding: 18px 15px; border: 1px solid #ddd; }
+    .admin-table th { background: #f7f7f7; text-align: left; font-size: 17px; }
+    .admin-table tbody tr:hover { background: #fafafa; }
+    .admin-table a { color: #2d60d6; text-decoration: none; }
+    .admin-table a.delete-link { color: #d32f2f; }
+    .admin-section .note { color: #666; margin-top: 8px; }
+</style>
+
+<div class="admin-page">
+    <?php echo $msg_html; ?>
+
+    <div class="admin-actions">
+        <a href="?page=admin_user_add" class="btn-add-user">+ Dodaj użytkownika</a>
+        <a href="?page=admin_trainer_add" class="btn-add-trainer">+ Dodaj trenera</a>
+    </div>
+
+    <div class="admin-section">
+        <h2>Lista użytkowników</h2>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Imię i nazwisko</th>
+                    <th>E-mail</th>
+                    <th>Rola</th>
+                    <th style="text-align:center;">Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($userResult && mysqli_num_rows($userResult) > 0): ?>
+                    <?php while ($userRow = mysqli_fetch_assoc($userResult)): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($userRow['id']); ?></td>
+                            <td><?php echo htmlspecialchars($userRow['nazwisko'] . ' ' . $userRow['imie']); ?></td>
+                            <td><?php echo htmlspecialchars($userRow['mail']); ?></td>
+                            <td><?php echo ($userRow['role'] == 1) ? '<strong>Admin</strong>' : 'Użytkownik'; ?></td>
+                            <td style="text-align:center;">
+                                <a href="?page=admin_user_edit&id=<?php echo htmlspecialchars($userRow['id']); ?>">Edytuj</a>
+                                |
+                                <a href="?page=admin_user_delete&id=<?php echo htmlspecialchars($userRow['id']); ?>" class="delete-link" onclick="return confirm('Czy na pewno chcesz usunąć tego użytkownika?');">Usuń</a>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="5" style="text-align:center;">Brak użytkowników w systemie.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="admin-section">
+        <h2>Lista trenerów</h2>
+        <?php if ($trainerTableExists): ?>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Imię i nazwisko</th>
+                        <th>Specjalizacja</th>
+                        <th>Telefon</th>
+                        <th>Cena</th>
+                        <th style="text-align:center;">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($trainers)): ?>
+                        <?php foreach ($trainers as $trainer): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($trainer['id']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['nazwisko'] . ' ' . $trainer['imie']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['specjalizacja']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['numer_telefonu'] ?? '-'); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['cena']); ?> zł</td>
+                                <td style="text-align:center;">
+                                    <a href="?page=admin_trainer_edit&id=<?php echo htmlspecialchars($trainer['id']); ?>">Edytuj</a>
+                                    |
+                                    <a href="?page=admin_trainer_delete&id=<?php echo htmlspecialchars($trainer['id']); ?>" class="delete-link" onclick="return confirm('Czy na pewno chcesz usunąć tego trenera?');">Usuń</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6" style="text-align:center;">Brak trenerów w bazie danych.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p class="note">Brak tabeli <strong>trenerzy</strong> w bazie danych. Zarządzanie trenerami jest niedostępne.</p>
+        <?php endif; ?>
+    </div>
+</div>
+<?php
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 1) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$msg_html = '';
+if (isset($_GET['msg'])) {
+    switch ($_GET['msg']) {
+        case 'user_added':
+            $msg_html = '<div class="admin-alert success">✅ Użytkownik został pomyślnie dodany.</div>';
+            break;
+        case 'user_updated':
+            $msg_html = '<div class="admin-alert success">✅ Dane użytkownika zostały zaktualizowane.</div>';
+            break;
+        case 'user_deleted':
+            $msg_html = '<div class="admin-alert success">✅ Użytkownik został usunięty.</div>';
+            break;
+        case 'trainer_added':
+            $msg_html = '<div class="admin-alert success">✅ Trener został dodany.</div>';
+            break;
+        case 'trainer_updated':
+            $msg_html = '<div class="admin-alert success">✅ Dane trenera zostały zaktualizowane.</div>';
+            break;
+        case 'trainer_deleted':
+            $msg_html = '<div class="admin-alert success">✅ Trener został usunięty.</div>';
+            break;
+        case 'db_error':
+            $msg_html = '<div class="admin-alert error">⛔ Wystąpił błąd bazy danych.</div>';
+            break;
+        case 'delete_self_error':
+            $msg_html = '<div class="admin-alert error">⛔ Nie możesz usunąć własnego konta administratora!</div>';
+            break;
+    }
+}
+
+$userResult = mysqli_query($conn, "SELECT id, imie, nazwisko, mail, role FROM users ORDER BY nazwisko ASC, imie ASC");
+$trainerResult = mysqli_query($conn, "SHOW TABLES LIKE 'trenerzy'");
+$trainers = [];
+$trainerTableExists = $trainerResult && mysqli_num_rows($trainerResult) > 0;
+if ($trainerTableExists) {
+    $trainerQuery = mysqli_query($conn, "SELECT id, imie, nazwisko, specjalizacja, numer_telefonu, cena FROM trenerzy ORDER BY nazwisko ASC, imie ASC");
+    if ($trainerQuery) {
+        while ($row = mysqli_fetch_assoc($trainerQuery)) {
+            $trainers[] = $row;
+        }
+    }
+}
+?>
+
+<style>
+    .admin-page { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    .admin-alert { padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; }
+    .admin-alert.success { background: #e6ffed; color: #1d6b2e; border: 1px solid #95d7a4; }
+    .admin-alert.error { background: #ffe7e7; color: #8b2323; border: 1px solid #f0a2a2; }
+    .admin-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 25px; }
+    .admin-actions a { padding: 12px 18px; border-radius: 10px; text-decoration: none; color: white; font-weight: bold; }
+    .btn-add-user { background: #2d8f29; }
+    .btn-add-trainer { background: #4a5ed6; }
+    .admin-section { margin-bottom: 40px; }
+    .admin-section h2 { margin-bottom: 15px; color: #333; font-size: 26px; }
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 16px; }
+    .admin-table th,
+    .admin-table td { padding: 18px 15px; border: 1px solid #ddd; }
+    .admin-table th { background: #f7f7f7; text-align: left; font-size: 17px; }
+    .admin-table tbody tr:hover { background: #fafafa; }
+    .admin-table a { color: #2d60d6; text-decoration: none; }
+    .admin-table a.delete-link { color: #d32f2f; }
+    .admin-section .note { color: #666; margin-top: 8px; }
+</style>
+
+<div class="admin-page">
+    <?php echo $msg_html; ?>
+
+    <div class="admin-actions">
+        <a href="?page=admin_user_add" class="btn-add-user">+ Dodaj użytkownika</a>
+        <a href="?page=admin_trainer_add" class="btn-add-trainer">+ Dodaj trenera</a>
+    </div>
+
+    <div class="admin-section">
+        <h2>Lista użytkowników</h2>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Imię i nazwisko</th>
+                    <th>E-mail</th>
+                    <th>Rola</th>
+                    <th style="text-align:center;">Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($userResult && mysqli_num_rows($userResult) > 0): ?>
+                    <?php while ($userRow = mysqli_fetch_assoc($userResult)): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($userRow['id']); ?></td>
+                            <td><?php echo htmlspecialchars($userRow['nazwisko'] . ' ' . $userRow['imie']); ?></td>
+                            <td><?php echo htmlspecialchars($userRow['mail']); ?></td>
+                            <td><?php echo ($userRow['role'] == 1) ? '<strong>Admin</strong>' : 'Użytkownik'; ?></td>
+                            <td style="text-align:center;">
+                                <a href="?page=admin_user_edit&id=<?php echo htmlspecialchars($userRow['id']); ?>">Edytuj</a>
+                                |
+                                <a href="?page=admin_user_delete&id=<?php echo htmlspecialchars($userRow['id']); ?>" class="delete-link" onclick="return confirm('Czy na pewno chcesz usunąć tego użytkownika?');">Usuń</a>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="5" style="text-align:center;">Brak użytkowników w systemie.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="admin-section">
+        <h2>Lista trenerów</h2>
+        <?php if ($trainerTableExists): ?>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Imię i nazwisko</th>
+                        <th>Specjalizacja</th>
+                        <th>Telefon</th>
+                        <th>Cena</th>
+                        <th style="text-align:center;">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($trainers)): ?>
+                        <?php foreach ($trainers as $trainer): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($trainer['id']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['nazwisko'] . ' ' . $trainer['imie']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['specjalizacja']); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['numer_telefonu'] ?? '-'); ?></td>
+                                <td><?php echo htmlspecialchars($trainer['cena']); ?> zł</td>
+                                <td style="text-align:center;">
+                                    <a href="?page=admin_trainer_edit&id=<?php echo htmlspecialchars($trainer['id']); ?>">Edytuj</a>
+                                    |
+                                    <a href="?page=admin_trainer_delete&id=<?php echo htmlspecialchars($trainer['id']); ?>" class="delete-link" onclick="return confirm('Czy na pewno chcesz usunąć tego trenera?');">Usuń</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6" style="text-align:center;">Brak trenerów w bazie danych.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p class="note">Brak tabeli <strong>trenerzy</strong> w bazie danych. Zarządzanie trenerami jest niedostępne.</p>
+        <?php endif; ?>
+    </div>
+</div>
+
+
+
+bmi.php -----
+
+    <div class="bmi-container">
+        <h1>Kalkulator BMI</h1>
+        <form id="bmiForm">
+            <label for="wzrost">Wzrost (cm):</label>
+            <input type="number" id="wzrost" name="wzrost" placeholder="Podaj swój wzrost w cm" required>
+
+            <label for="waga">Waga (kg):</label>
+            <input type="number" id="waga" name="waga" placeholder="Podaj swoją wagę w kg" required>
+
+            <button type="button" id="obliczBMI">Oblicz BMI</button>
+        </form>
+        <div id="wynikBMI" class="bmi-result"></div>
+    </div>
+
+    <div class="bmi-image-section">
+        <div class="bmi-image-container">
+            <img id="bmiImage" src="pic/bmi.png" alt="Tabela wskaźnika BMI dla różnych kategorii wagowych" />
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('obliczBMI').addEventListener('click', function() {
+            const wzrost = parseFloat(document.getElementById('wzrost').value) / 100;
+            const waga = parseFloat(document.getElementById('waga').value);
+
+            const wynikBMI = document.getElementById('wynikBMI');
+            if (wzrost > 0 && waga > 0) {
+                const bmi = (waga / (wzrost * wzrost)).toFixed(2);
+                let kategoria = '';
+
+                if (bmi < 18.5) {
+                    kategoria = 'Niedowaga';
+                } else if (bmi >= 18.5 && bmi < 24.9) {
+                    kategoria = 'Waga prawidłowa';
+                } else if (bmi >= 25 && bmi < 29.9) {
+                    kategoria = 'Nadwaga';
+                } else {
+                    kategoria = 'Otyłość';
+                }
+
+                wynikBMI.innerText = `Twoje BMI: ${bmi} (${kategoria})`;
+            } else {
+                wynikBMI.innerText = 'Podaj prawidłowe wartości wzrostu i wagi.';
+            }
+        });
+    </script>
+
+
+
+home.php -----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="main_container">
+        <img src="pic/gym1.jpg" alt="Zdjęcie siłowni" class="main_image">
+        <div class="overlay">
+            <h1 class="overlay-text">ENERGYM</h1>
+        </div>
+    </div>
+
+    <div class="opinion_section">
+        <button class="arrow left-arrow" onclick="moveOpinions(-1)">&#9664;</button>
+        <div class="opinion_container">
+            <div class="opinion_card">
+                <p class="opinion_text">Bardzo polecam tę siłownię. Dużo sprzętu do wyboru<br>
+                ⭐⭐⭐⭐⭐</p>
+                <p class="customer_name">~Michał Sakowski~</p>
+            </div>
+            <div class="opinion_card">
+                <p class="opinion_text">Siłownia bardzo dobrze wyposażona. Miła obsługa ;)<br>
+                ⭐⭐⭐⭐⭐</p>
+                <p class="customer_name">~Robert Orzechowski~</p>
+            </div>
+            <div class="opinion_card">
+                <p class="opinion_text">Świetna lokalizacja klubów. Na pewno przedłużę karnet.<br>
+                ⭐⭐⭐⭐⭐</p>
+                <p class="customer_name">~Paweł Sikora~</p>
+            </div>
+            <div class="opinion_card">
+                <p class="opinion_text">Duża siłownia z wystarczającą ilościa miejsca do ćwiczeń.<br>
+                ⭐⭐⭐⭐⭐</p>
+                <p class="customer_name">~Michał Owczarzak~</p>
+            </div>
+        </div>
+        <button class="arrow right-arrow" onclick="moveOpinions(1)">&#9654;</button>
+    </div>
+
+
+
+
+karnety.php ------
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="naglowek">
+        <h1>Poznaj naszą ofertę!</h1>
+    </div>
+
+    <div class="karnety_section">
+        <div class="karnet_card" style="background-image: url('pic/basic.webp'); background-size: cover; background-position: center;">
+            <h2 style="font-size: 3rem; color: white;">Karnet Basic</h2>
+            <p style="font-size: 1.5rem; color: white;">Idealny dla osób rozpoczynających swoją przygodę z siłownią</p>
+            <p class="karnet_price">79,99 PLN / mies.</p>
+            <button onclick="openModal('basicModal')" class="karnet_button">Sprawdź</button>
+        </div>
+        <div class="karnet_card" style="background-image: url('pic/standard.webp'); background-size: cover; background-position: center;">
+            <h2 style="font-size: 3rem; color: white;">Karnet Standard</h2>
+            <p style="font-size: 1.5rem; color: white;">Dopasowany do potrzeb osób zaawansowanych w treningu siłowym</p>
+            <p class="karnet_price">119,99 PLN / mies.</p>
+            <button onclick="openModal('standardModal')" class="karnet_button">Sprawdź</button>
+        </div>
+        <div class="karnet_card" style="background-image: url('pic/premium.webp'); background-size: cover; background-position: center;">
+            <h2 style="font-size: 3rem; color: white;">Karnet Premium</h2>
+            <p style="font-size: 1.5rem; color: white;">Spełni oczekiwania nawet najbardziej wymagających klientów</p>
+            <p class="karnet_price">199,99 PLN / mies.</p>
+            <button onclick="openModal('premiumModal')" class="karnet_button">Sprawdź</button>
+        </div>
+    </div>
+
+    <div id="basicModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('basicModal')">&times;</span>
+            <h2>Karnet Basic</h2>
+            <ul>
+                <li>Możliwość wejścia do wybranego klubu do godz. 16:00 przez 7 dni w tygodniu.</li>
+                <li>Darmowy trening z trenerem personalnym jednorazowo w miesiącu.</li>
+                <li>Wybór jednego dowolnego klubu w ramach jednego karnetu.</li>
+            </ul>
+            <button class="buy-button" onclick="location.href='transakcja'">Dokonaj zakupu</button>
+        </div>
+    </div>
+
+    <div id="standardModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('standardModal')">&times;</span>
+            <h2>Karnet Standard</h2>
+            <ul>
+                <li>Możliwość wejścia do jednego klubu przez 7 dni w tyg. o dowolnej porze w godzinach otwarcia klubu.</li>
+                <li>Dostęp do zapisu na jedne wybrane zajęcia grupowe w ramach jednego karnetu.</li>
+                <li>Możliwość otrzymania darmowych planów treningowych od naszych ekspertów.</li>
+            </ul>
+            <button class="buy-button" onclick="location.href='transakcja'">Dokonaj zakupu</button>
+        </div>
+    </div>
+
+    <div id="premiumModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('premiumModal')">&times;</span>
+            <h2>Karnet Premium</h2>
+            <ul>
+                <li>Możliwość wejścia do dowolnego klubu przez 7 dni w tyg. o dowolnej porze w godzinach otwarcia klubu.</li>
+                <li>Dostęp do zapisu na wszystkie zajęcia grupowe w ramach jednego karnetu.</li>
+                <li>Jedne darmowe konsultacje z dietetykiem raz w obrębie okresu rozliczeniowego karnetu.</li>
+            </ul>
+            <button class="buy-button" onclick="location.href='transakcja'">Dokonaj zakupu</button>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('show');
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    window.onclick = function(event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (event.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
+    };
+    </script>
+
+
+
+kluby.php ----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="naglowek">
+        <h1>Nasze Kluby</h1>
+    </div>
+
+    <div class="kluby_section">
+        <div class="klub_card" style="background-image: url('pic/club1.webp'); opacity: 0.8;">
+            <h2>SouthClub</h2>
+            <p>Położony na południu Krakowa, oferuje nowoczesny sprzęt i dużo sal fitness.</p>
+            <button class="klub_button" onclick="openPopup('popupSouth')">Zobacz więcej</button>
+        </div>
+        <div class="klub_card" style="background-image: url('pic/club2.webp'); opacity: 0.8;">
+            <h2>EastClub</h2>
+            <p>Doskonale wyposażony z przestronnymi salami do zajęć grupowych oraz salą do gry w squash.</p>
+            <button class="klub_button" onclick="openPopup('popupEast')">Zobacz więcej</button>
+        </div>
+        <div class="klub_card" style="background-image: url('pic/club3.webp'); opacity: 0.8;">
+            <h2>NorthClub</h2>
+            <p>Oprócz samej siłowni oferuje dostęp do boiska koszykarskiego, salę MMA oraz dwie sauny.</p>
+            <button class="klub_button" onclick="openPopup('popupNorth')">Zobacz więcej</button>
+        </div>
+    </div>
+
+    <div id="popupSouth" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePopup('popupSouth')">&times;</span>
+            <h2>SouthClub</h2>
+            <p>SouthClub to najnowocześniejsza siłownia w Krakowie. Oferujemy:</p>
+            <ul>
+                <li>Nowoczesny sprzęt do ćwiczeń.</li>
+                <li>Dużo sal fitness.</li>
+                <li>Dogodna lokalizacja na południu Krakowa.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="popupEast" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePopup('popupEast')">&times;</span>
+            <h2>EastClub</h2>
+            <p>EastClub wyróżnia się doskonałym wyposażeniem:</p>
+            <ul>
+                <li>Przestronne sale do zajęć grupowych.</li>
+                <li>Nowoczesna sala do gry w squash.</li>
+                <li>Profesjonalna obsługa i wsparcie trenerów.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="popupNorth" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePopup('popupNorth')">&times;</span>
+            <h2>NorthClub</h2>
+            <p>NorthClub to idealne miejsce dla aktywnych:</p>
+            <ul>
+                <li>Boisko koszykarskie.</li>
+                <li>Profesjonalna sala MMA.</li>
+                <li>Dwie nowoczesne sauny.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="map" style="height: 500px; margin: 20px 0;"></div>
+
+    <script>
+        function openPopup(id) {
+            const modal = document.getElementById(id);
+            modal.classList.add('show');
+        }
+
+        function closePopup(id) {
+            const modal = document.getElementById(id);
+            modal.classList.remove('show');
+        }
+
+        var map = L.map('map').setView([50.058, 19.935], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var marker1 = L.marker([50.041417, 19.922111]).addTo(map);
+        marker1.bindPopup("<b>SouthClub</b><br>Położony na południu Krakowa, oferuje nowoczesny sprzęt i dużo sal fitness.");
+
+        var marker2 = L.marker([50.058151, 19.957071]).addTo(map);
+        marker2.bindPopup("<b>EastClub</b><br>Doskonale wyposażony z przestronnymi salami do zajęć grupowych oraz salą do gry w squash.");
+
+        var marker3 = L.marker([50.080424, 19.919762]).addTo(map);
+        marker3.bindPopup("<b>NorthClub</b><br>Oprócz samej siłowni oferuje dostęp do boiska koszykarskiego, salę MMA oraz dwie sauny.");
+
+        var bounds = L.featureGroup([marker1, marker2, marker3]).getBounds();
+        map.fitBounds(bounds);
+    </script>
+
+
+
+
+kontakt.php
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="kontakt_section">
+        <div class="kontakt_card">
+            <h2>Kontakt i FAQ</h2>
+            <p>W przypadku chęci kontaktu z powodu zapisu na zajęcia, składania zażaleń, uzgadniania spraw formalnych lub prawnych oraz ewentualnych pytań, należy zgłosić się osobiście do wybranego klubu w godzinach otwarcia bądź skorzystać z następujących form kontaktu:</p>
+            <ul>
+                <li>nr telefonu: +48 574 848 202, +48 590 634 215</li>
+                <li>e-mail: energym@gmail.com, silownia_energym@wp.pl</li>
+            </ul>
+            <p>Zapraszamy do kontaktu!</p>
+        </div>
+
+        <div class="kontakt_card">
+            <h2>FAQ - Najczęściej zadawane pytania</h2>
+            <h3>1. W jakich godzinach otwarcia funkcjonuje siłownia?</h3>
+            <p>Wszystkie nasze kluby są otwarte przez 7 dni w tygodniu w godzinach: 6:30 - 23:00 (godziny otwarcia w święta mogą się różnić od tradycyjnych).</p>
+            
+            <h3>2. Jak zakupić karnet do klubu/klubów?</h3>
+            <p>W celu dokonania zakupu karnetu należy przejść bezpośrednio ze strony głównej EnerGym w zakładkę "Karnety" i postępować wg dalszych instrukcji i informacji. Można również skorzystać z formy telefonicznej lub zakupić karnet stacjonarnie w wybranym klubie.</p>
+            
+            <h3>3. Czy mogę zamrozić karnet na czas nieokreślony?</h3>
+            <p>Zakupione karnety są ważne przez miesiąc od daty zakupu. Zamrożenie karnetu jest opcją dostępną tylko dwa razy w roku kalendarzowym oraz na maksymalnie dwa tygodnie (bez opłat). W przypadku dłuższego zamrożenia, klient zobowiązany jest wnieść dodatkową opłatę w wysokości 30 zł za odmrożenie karnetu do końca okresu rozliczeniowego.</p>
+            
+            <h3>4. Czy mogę zwrócić karnet?</h3>
+            <p>Nie, zakupione karnety są niemożliwe do zwrócenia, a tym samym - opłata za niego jest bezzwrotna. Prosimy o dokonywanie przemyślanych zakupów.</p>
+            
+            <h3>5. Jakie zajęcia grupowe są dostępne w ramach karnetów?</h3>
+            <p>W Karnecie Basic zajęcia grupowe nie zawierają się w jego cenie - jeśli klient chce na takie uczęszczać, musi dokonać oddzielnego zapisu i zakupu. W przypadku Karnetu Standard - klient ma możliwość zapisu na jedne wybrane zajęcia grupowe w cenie karnetu. W przypadku Karnetu Premium - można uczęszczać na wszystkie zajęcia bez dodatkowych opłat.</p>
+            
+            <h3>6. Czy w klubach są szafki na klucz?</h3>
+            <p>Tak, we wszystkich naszych klubach są szafki na klucz, który klient dostaje każdorazowo na recepcji przy wejściu na siłownię.</p>
+            
+            <h3>7. Czy mogę kupić na siłowni wodę bądź suplementy?</h3>
+            <p>Tak, wszystkie kluby posiadają na recepcji szeroką gamę suplementów oraz napojów.</p>
+        </div>
+    </div>
+
+
+
+logowanie.php----
+<?php
+// Zabezpieczenie przed zalogowanymi (nie logujemy się dwa razy)
+if (isset($_SESSION['user_id'])) {
+    header("Location: ?page=home");
+    exit();
+}
+
+$message = "";
+$messageType = "";
+
+// Odbieranie komunikatu o udanej rejestracji
+if (isset($_GET['msg']) && $_GET['msg'] === 'registered') {
+    $message = "Konto zostało założone! Możesz się teraz zalogować.";
+    $messageType = "success";
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $mail = trim($_POST['mail'] ?? '');
+    $haslo = $_POST['haslo'] ?? '';
+
+    if (empty($mail) || empty($haslo)) {
+        $message = "Wpisz e-mail i hasło.";
+        $messageType = "error";
+    } else {
+        // Zabezpieczenie e-maila
+        $mail_safe = mysqli_real_escape_string($conn, $mail);
+        
+        // Szukamy użytkownika po e-mailu
+        $sql = "SELECT id, imie, haslo, role FROM users WHERE mail = '$mail_safe'";
+        $result = mysqli_query($conn, $sql);
+
+        if (mysqli_num_rows($result) === 1) {
+            $row = mysqli_fetch_assoc($result);
+            
+            // Weryfikacja hasła
+            if (password_verify($haslo, $row['haslo'])) {
+                
+                // SUKCES! Zapisujemy dane w sesji
+                $_SESSION['user_id'] = $row['id'];
+                $_SESSION['imie'] = $row['imie'];
+                $_SESSION['role'] = (int)$row['role'];
+
+                // Przekierowanie na stronę główną po udanym zalogowaniu
+                header("Location: ?page=home");
+                exit();
+            } else {
+                $message = "Błędne hasło!";
+                $messageType = "error";
+            }
+        } else {
+            $message = "Nie znaleziono konta z takim adresem e-mail.";
+            $messageType = "error";
+        }
+    }
+}
+?>
+
+<style>
+    .login-container {
+        width: 33%;
+        min-width: 320px;
+        box-sizing: border-box;
+        margin: 60px auto;
+        padding: 40px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        border: 3px solid #7a17cb;
+    }
+
+    .login-container h1 {
+        text-align: center;
+        color: #1a1a1a;
+        font-size: 32px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .login-subtitle {
+        text-align: center;
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 30px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: #7a17cb;
+        background-color: #f5f0ff;
+        box-shadow: 0 0 10px rgba(122, 23, 203, 0.2);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #7a17cb 0%, #b45ed6 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(122, 23, 203, 0.4);
+    }
+
+    .submit-btn:active {
+        transform: translateY(0);
+    }
+
+    .error-message {
+        background-color: #ff6b6b;
+        color: white;
+        padding: 14px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #d63031;
+        font-weight: 500;
+    }
+
+    .success-message {
+        background-color: #51cf66;
+        color: white;
+        padding: 14px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #2f9e44;
+        font-weight: 500;
+    }
+
+    .register-link-section {
+        text-align: center;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 2px solid #eee;
+    }
+
+    .register-link-section p {
+        color: #666;
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .register-link-section a {
+        color: #7a17cb;
+        text-decoration: none;
+        font-weight: bold;
+        transition: color 0.3s ease;
+    }
+
+    .register-link-section a:hover {
+        color: #b45ed6;
+        text-decoration: underline;
+    }
+</style>
+
+<div class="login-container">
+    <h1>🔓 Logowanie</h1>
+    <p class="login-subtitle">Zaloguj się do swojego konta EnerGym</p>
+
+    <?php if (!empty($message)): ?>
+        <?php if ($messageType === 'error'): ?>
+            <div class="error-message"><?php echo $message; ?></div>
+        <?php elseif ($messageType === 'success'): ?>
+            <div class="success-message"><?php echo $message; ?></div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <form method="POST" action="">
+        <div class="form-group">
+            <label for="mail">📧 Adres E-mail</label>
+            <input type="email" id="mail" name="mail" placeholder="Wpisz swój e-mail" required>
+        </div>
+
+        <div class="form-group">
+            <label for="haslo">🔑 Hasło</label>
+            <input type="password" id="haslo" name="haslo" placeholder="Wpisz swoje hasło" required>
+        </div>
+        
+        <button type="submit" class="submit-btn">Zaloguj się 💪</button>
+    </form>
+
+    <div class="register-link-section">
+        <p>Nie masz jeszcze konta? <a href="?page=rejestracja">Zarejestruj się tutaj!</a></p>
+    </div>
+</div>
+
+
+
+onas.php ----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="section">
+        <div class="card">
+            <h2>Historia</h2>
+            <p>
+                Wszystko zaczęło się w 2015 roku, kiedy trójka przyjaciół – Anna, 
+                Michał i Tomasz – postanowili połączyć swoje pasje do sportu, 
+                zdrowego stylu życia i wspierania lokalnej społeczności. Wszyscy byli
+                 związani z różnymi dyscyplinami sportowymi: Anna była trenerką fitness, 
+                 Michał zajmował się kulturystyką, a Tomasz pasjonował się treningiem 
+                 funkcjonalnym i biegami przeszkodowymi. Jednak każda z ich ulubionych siłowni, 
+                 do których uczęszczali, wydawała się oferować tylko częściowe rozwiązania.
+
+                Brakowało miejsca, które byłoby przestrzenią dla ludzi w różnym wieku,
+                 o różnych celach i poziomach zaawansowania – miejsca, które jednocześnie 
+                 promowałoby pasję do sportu i pozytywną energię. Z tego marzenia narodził się
+                  pomysł na Energym – siłownię, która miała być czymś więcej niż tylko miejscem do 
+                  treningu. Miała stać się społecznością, w której energia fizyczna łączyłaby się
+                   z emocjonalną.
+            </p>
+        </div>
+        <div class="card">
+            <h2>Nasza misja</h2>
+            <p>
+                Naszą misją jest promowanie zdrowego stylu życia i aktywności
+                 fizycznej poprzez oferowanie najwyższej jakości usług fitness
+                  i nowoczesnego sprzętu. W ENERGYM stawiamy na innowacje
+                   i ciągły rozwój, aby sprostać oczekiwaniom naszych klubowiczów.
+                    Chcemy, aby każdy, kto odwiedza nasze kluby, czuł się zmotywowany
+                     i wspierany w osiąganiu swoich celów fitness.
+            </p>
+        </div>
+        <div class="card">
+            <h2>Nasze wartości</h2>
+            <p>
+                Innowacyjność: Stale wprowadzamy nowe technologie
+                i rozwiązania, aby zapewnić naszym członkom najlepsze 
+                doświadczenia treningowe. Wierzymy, że innowacje są kluczem 
+                do sukcesu i ciągłego rozwoju.
+                <br><br>
+                Społeczność: Tworzymy przyjazne i wspierające środowisko, 
+                w którym każdy może osiągnąć swoje cele fitness. Nasze kluby 
+                to miejsca, gdzie nawiązują się nowe przyjaźnie i gdzie każdy 
+                czuje się częścią większej społeczności.
+                <br><br>    
+                Zaangażowanie: Na bieżąco słuchamy ewentualnych uwag oraz możliwości 
+                zmian proponowanych przez naszych klientów, dzięki czemu stajemy się
+                coraz bardziej komfortowym miejscem do uprawiania sportu.
+            </p>
+        </div>
+        <div class="card">
+            <h2>Dołącz do nas</h2>
+            <p>
+                Dołącz do ENERGYM i stań się częścią naszej rosnącej społeczności, 
+                która łączy pasję do sportu z dbałością o jakość usług! Niezależnie od tego, 
+                czy jesteś początkującym, czy doświadczonym sportowcem, w naszych klubach 
+                znajdziesz wszystko, czego potrzebujesz, aby osiągnąć swoje cele. 
+                Czekamy na Ciebie w naszych klubach w całym Krakowie.
+            </p>
+        </div>
+    </div>
+
+
+
+profilphp -=====
+<?php
+// Włączyć error reporting do debugowania
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Sprawdzenie czy użytkownik jest zalogowany
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ?page=logowanie");
+    exit();
+}
+
+// // Debug: sprawdzenie dostępności zmiennych
+// $debug = [
+//     'session_active' => session_status() === PHP_SESSION_ACTIVE,
+//     'user_id_set' => isset($_SESSION['user_id']),
+//     'user_id' => $_SESSION['user_id'] ?? null,
+//     'imie' => $_SESSION['imie'] ?? null,
+//     'conn_exists' => isset($conn),
+//     'conn_valid' => isset($conn) && $conn !== false,
+// ];
+
+// Pobranie danych użytkownika z bazy
+$user_id = $_SESSION['user_id'];
+$user = null;
+$error_msg = "";
+$profile_message = "";
+$profile_message_type = "";
+
+$baseCols = ['id','imie','nazwisko','mail','role'];
+$optionalCols = ['pesel','numer_telefonu','miasto','ulica','numer_domu','numer_lokalu','kod_pocztowy','opinia','karnet_typ','karnet_zakup','karnet_koniec','waga','wzrost','bmi'];
+
+// Obsługa zapisu profilu
+if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $pesel_input = trim($_POST['pesel'] ?? '');
+    $pesel_valid = true;
+    
+    if ($pesel_input !== '') {
+        if (!preg_match('/^[0-9]{11}$/', $pesel_input)) {
+            $pesel_valid = false;
+        } else {
+            $digits = str_split($pesel_input);
+            $weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+            $sum = 0;
+            foreach ($weights as $index => $weight) {
+                $sum += $weight * (int)$digits[$index];
+            }
+            $control = (10 - ($sum % 10)) % 10;
+            if ($control !== (int)$digits[10]) {
+                $pesel_valid = false;
+            }
+        }
+    }
+
+    if (!$pesel_valid) {
+        $profile_message = "PESEL jest nieprawidłowy. Sprawdź sumę kontrolną i długość 11 cyfr.";
+        $profile_message_type = "error";
+    } else {
+        $mail_input = trim($_POST['mail'] ?? '');
+        $mail_safe = mysqli_real_escape_string($conn, $mail_input);
+        $email_check_sql = "SELECT id FROM users WHERE mail = '$mail_safe' AND id != '$user_id'";
+        $email_check_result = mysqli_query($conn, $email_check_sql);
+
+        if ($email_check_result && mysqli_num_rows($email_check_result) > 0) {
+            $profile_message = "Użytkownik z takim adresem e-mail już istnieje!";
+            $profile_message_type = "error";
+        } else {
+            $updatedCols = ['imie', 'nazwisko', 'mail'];
+            foreach ($optionalCols as $col) {
+                $check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE '$col'");
+                if ($check && mysqli_num_rows($check) > 0) {
+                    $updatedCols[] = $col;
+                }
+            }
+
+            // Obliczanie BMI automatycznie przy podaniu wagi i wzrostu
+            $waga_input = trim($_POST['waga'] ?? '');
+            $wzrost_input = trim($_POST['wzrost'] ?? '');
+            if ($waga_input !== '' && $wzrost_input !== '' && is_numeric($waga_input) && is_numeric($wzrost_input) && (float)$wzrost_input > 0) {
+                $_POST['bmi'] = round((float)$waga_input / (((float)$wzrost_input / 100) ** 2), 1);
+            }
+
+            $updates = [];
+            foreach ($updatedCols as $col) {
+                if ($col === 'role' || $col === 'id') {
+                    continue;
+                }
+
+                $value = trim($_POST[$col] ?? '');
+                $escaped = mysqli_real_escape_string($conn, $value);
+
+                if ($escaped === '') {
+                    $updates[] = "$col = NULL";
+                } else {
+                    $updates[] = "$col = '$escaped'";
+                }
+
+                if ($col === 'imie') {
+                    $_SESSION['imie'] = $value;
+                }
+            }
+
+            if (!empty($updates)) {
+                $sqlUpdate = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = '$user_id'";
+                if (mysqli_query($conn, $sqlUpdate)) {
+                    $profile_message = "Dane w profilu zostały zapisane.";
+                    $profile_message_type = "success";
+                } else {
+                    $profile_message = "Błąd podczas zapisu: " . mysqli_error($conn);
+                    $profile_message_type = "error";
+                }
+            }
+        }
+    }
+}
+
+if (!isset($conn) || !$conn) {
+    $error_msg = "Baza danych nie jest dostępna (conn nie ustawione)";
+} else {
+    $selectCols = $baseCols;
+    foreach ($optionalCols as $col) {
+        $check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE '$col'");
+        if ($check && mysqli_num_rows($check) > 0) {
+            $selectCols[] = $col;
+        }
+    }
+
+    $sql = "SELECT " . implode(',', $selectCols) . " FROM users WHERE id = '$user_id'";
+    $result = mysqli_query($conn, $sql);
+
+    if (!$result) {
+        $error_msg = "Błąd zapytania: " . mysqli_error($conn);
+    } elseif (mysqli_num_rows($result) > 0) {
+        $user = mysqli_fetch_assoc($result);
+    } else {
+        $error_msg = "Użytkownik o ID $user_id nie znaleziony w bazie";
+    }
+}
+
+// Pobranie aktywnych karnetów użytkownika (opcjonalne)
+$karnety = [];
+if ($user && $conn) {
+    // Najpierw sprawdźmy, czy tabela istnieje, żeby uniknąć fatalnego błędu
+    $check_table = mysqli_query($conn, "SHOW TABLES LIKE 'user_karnety'");
+    if ($check_table && mysqli_num_rows($check_table) > 0) {
+        $sql_karnety = "SELECT * FROM user_karnety WHERE user_id = '$user_id' AND data_konca >= NOW()";
+        $result_karnety = mysqli_query($conn, $sql_karnety);
+        if ($result_karnety && mysqli_num_rows($result_karnety) > 0) {
+            while ($karnet = mysqli_fetch_assoc($result_karnety)) {
+                $karnety[] = $karnet;
+            }
+        }
+    } else {
+        // tabela user_karnety nie istnieje — pozostawiamy listę pustą
+        $karnety = [];
+    }
+}
+?>
+
+<style>
+    .profile-container {
+        width: 50%;
+        min-width: 320px;
+        box-sizing: border-box;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .debug-panel {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        color: #856404;
+        font-family: monospace;
+        font-size: 13px;
+    }
+
+    .debug-panel h3 {
+        margin-top: 0;
+        color: #856404;
+    }
+
+    .debug-item {
+        padding: 8px;
+        border-bottom: 1px solid #ffe69c;
+    }
+
+    .debug-item:last-child {
+        border-bottom: none;
+    }
+
+    .debug-value {
+        color: #004085;
+        font-weight: bold;
+    }
+
+    .profile-header {
+        background: linear-gradient(135deg, #7a17cb 0%, #b45ed6 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 20px rgba(122, 23, 203, 0.3);
+    }
+
+    .profile-header h1 {
+        margin: 0;
+        font-size: 36px;
+        margin-bottom: 10px;
+    }
+
+    .profile-header p {
+        margin: 5px 0;
+        font-size: 16px;
+        opacity: 0.95;
+    }
+
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .profile-edit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    @media (max-width: 820px) {
+        .profile-edit-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .profile-card textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 12px 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+        resize: vertical;
+    }
+
+    .profile-card textarea:focus,
+    .profile-card input:focus {
+        outline: none;
+        border-color: #7a17cb;
+        background-color: #f5f0ff;
+        box-shadow: 0 0 10px rgba(122, 23, 203, 0.2);
+    }
+
+    .profile-card input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    }
+
+    .profile-card input:focus {
+        outline: none;
+        border-color: #7a17cb;
+        background-color: #f5f0ff;
+        box-shadow: 0 0 10px rgba(122, 23, 203, 0.2);
+    }
+
+    .profile-card .form-group {
+        margin: 0;
+    }
+
+    .profile-card .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .profile-card .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #7a17cb 0%, #b45ed6 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .profile-card .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(122, 23, 203, 0.4);
+    }
+
+    .profile-card .submit-btn:active {
+        transform: translateY(0);
+    }
+
+    .profile-card .success-message,
+    .profile-card .error-message {
+        margin: 0 0 16px 0;
+        padding: 12px 15px;
+        border-radius: 8px;
+        font-weight: 500;
+        color: white;
+    }
+
+    .profile-card .success-message {
+        background-color: #51cf66;
+        border-left: 4px solid #2f9e44;
+    }
+
+    .profile-card .error-message {
+        background-color: #ff6b6b;
+        border-left: 4px solid #d63031;
+    }
+
+    .profile-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        padding: 25px;
+        border-radius: 12px;
+        border: 2px solid #7a17cb;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .profile-card h3 {
+        color: #7a17cb;
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .profile-card p {
+        margin: 10px 0;
+        color: #333;
+        font-size: 15px;
+    }
+
+    .profile-card .label {
+        color: #666;
+        font-weight: bold;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .profile-card .value {
+        color: #1a1a1a;
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    .karnety-section {
+        grid-column: 1 / -1;
+    }
+
+    .karnety-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .karnet-item {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #7a17cb;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .karnet-item h4 {
+        margin: 0 0 10px 0;
+        color: #7a17cb;
+        font-size: 14px;
+    }
+
+    .karnet-item p {
+        margin: 5px 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .empty-message {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 20px;
+        background: #f0f0f0;
+        border-radius: 8px;
+        color: #666;
+    }
+
+    .action-buttons {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .btn {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #7a17cb 0%, #b45ed6 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(122, 23, 203, 0.4);
+    }
+
+    .btn-secondary {
+        background: white;
+        color: #7a17cb;
+        border: 2px solid #7a17cb;
+    }
+
+    .btn-secondary:hover {
+        background: #f5f0ff;
+        transform: translateY(-2px);
+    }
+
+    .error-box {
+        background: #ffebee;
+        color: #c62828;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #d32f2f;
+    }
+
+    .error-box h2 {
+        margin-top: 0;
+        color: #d32f2f;
+    }
+
+    .error-box ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .error-box li {
+        margin: 8px 0;
+    }
+
+    @media (max-width: 768px) {
+        .profile-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-header h1 {
+            font-size: 28px;
+        }
+
+        .karnety-list {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="profile-container">
+<!-- <div class="debug-panel">
+        <h3>🔍 Debug Info</h3>
+        <div class="debug-item">
+            <strong>Session Status:</strong> 
+            <span class="debug-value"><?php echo $debug['session_active'] ? '✓' : '✗'; ?></span>
+        </div>
+        <div class="debug-item">
+            <strong>User ID in Session:</strong> 
+            <span class="debug-value"><?php echo $debug['user_id_set'] ? htmlspecialchars($debug['user_id']) : '✗ NOT SET'; ?></span>
+        </div>
+        <div class="debug-item">
+            <strong>Session Imie:</strong> 
+            <span class="debug-value"><?php echo $debug['imie'] ?: '✗ NOT SET'; ?></span>
+        </div>
+        <div class="debug-item">
+            <strong>$conn exists:</strong> 
+            <span class="debug-value"><?php echo $debug['conn_exists'] ? '✓' : '✗'; ?></span>
+        </div>
+        <div class="debug-item">
+            <strong>$conn is valid:</strong> 
+            <span class="debug-value"><?php echo $debug['conn_valid'] ? '✓ CONNECTED' : '✗ FAILED'; ?></span>
+        </div>
+        <div class="debug-item">
+            <strong>User Found in DB:</strong> 
+            <span class="debug-value"><?php echo $user ? '✓' : '✗'; ?></span>
+        </div>
+        <?php if ($error_msg): ?>
+            <div class="debug-item">
+                <strong>❌ ERROR:</strong> 
+                <span class="debug-value"><?php echo htmlspecialchars($error_msg); ?></span>
+            </div>
+        <?php endif; ?>
+    </div> -->
+
+    <?php if ($user): ?>
+        <div class="profile-header">
+            <h1>👤 <?php echo htmlspecialchars($user['imie'] . ' ' . $user['nazwisko']); ?><?php echo ($user['role'] == 1) ? ' (Admin)' : ''; ?></h1>
+            <p>Witaj w Twoim profilu EnerGym!</p>
+            <?php if ($user['role'] == 1): ?>
+                <p><a href="?page=admin" style="color: #ffeb3b; text-decoration: underline;">Przejdź do panelu admina</a></p>
+            <?php endif; ?>
+        </div>
+
+        <div class="profile-grid">
+            <div class="profile-card">
+                <h3>📧 Dane Kontaktowe</h3>
+                <p>
+                    <span class="label">Adres E-mail:</span><br>
+                    <span class="value"><?php echo htmlspecialchars($user['mail']); ?></span>
+                </p>
+                <p>
+                    <span class="label">Imię:</span><br>
+                    <span class="value"><?php echo htmlspecialchars($user['imie']); ?></span>
+                </p>
+                <p>
+                    <span class="label">Nazwisko:</span><br>
+                    <span class="value"><?php echo htmlspecialchars($user['nazwisko']); ?></span>
+                </p>
+            </div>
+
+            <div class="profile-card">
+                <h3>🏆 Status Konta</h3>
+                <p>
+                    <span class="label">ID Użytkownika:</span><br>
+                    <span class="value"><?php echo htmlspecialchars($user['id']); ?></span>
+                </p>
+                <p>
+                    <span class="label">Typ Konta:</span><br>
+                    <span class="value"><?php echo ($user['role'] == 1) ? 'Administrator' : 'Użytkownik'; ?></span>
+                </p>
+                <p>
+                    <span class="label">Status:</span><br>
+                    <span class="value" style="color: #51cf66;">✓ Aktywne</span>
+                </p>
+            </div>
+
+            <div class="profile-card">
+                <h3>🏠 Adres zamieszkania</h3>
+                <?php if (!empty($user['miasto']) || !empty($user['ulica']) || !empty($user['numer_domu']) || !empty($user['numer_lokalu']) || !empty($user['kod_pocztowy'])): ?>
+                    <p><span class="label">Miasto:</span><br><span class="value"><?php echo htmlspecialchars($user['miasto'] ?? '-'); ?></span></p>
+                    <p><span class="label">Ulica:</span><br><span class="value"><?php echo htmlspecialchars($user['ulica'] ?? '-'); ?></span></p>
+                    <p><span class="label">Nr domu:</span><br><span class="value"><?php echo htmlspecialchars($user['numer_domu'] ?? '-'); ?></span></p>
+                    <p><span class="label">Nr lokalu:</span><br><span class="value"><?php echo htmlspecialchars($user['numer_lokalu'] ?? '-'); ?></span></p>
+                    <p><span class="label">Kod pocztowy:</span><br><span class="value"><?php echo htmlspecialchars($user['kod_pocztowy'] ?? '-'); ?></span></p>
+                <?php else: ?>
+                    <p class="value">Adres nie został jeszcze uzupełniony.</p>
+                <?php endif; ?>
+            </div>
+
+            <div class="profile-card">
+                <h3>🎟️ Karnet</h3>
+                <?php if (!empty($user['karnet_typ']) || !empty($user['karnet_zakup']) || !empty($user['karnet_koniec'])): ?>
+                    <p><span class="label">Typ karnetu:</span><br><span class="value"><?php echo htmlspecialchars($user['karnet_typ'] ?? '-'); ?></span></p>
+                    <p><span class="label">Data zakupu:</span><br><span class="value"><?php echo !empty($user['karnet_zakup']) ? date('d.m.Y', strtotime($user['karnet_zakup'])) : '-'; ?></span></p>
+                    <p><span class="label">Data końca:</span><br><span class="value"><?php echo !empty($user['karnet_koniec']) ? date('d.m.Y', strtotime($user['karnet_koniec'])) : '-'; ?></span></p>
+                <?php else: ?>
+                    <p class="value">Brak karnetu.</p>
+                    <p><a href="?page=karnety" style="color: #7a17cb; font-weight: bold; text-decoration: underline;">Sprawdź ofertę karnetów</a></p>
+                <?php endif; ?>
+            </div>
+
+            <div class="profile-card">
+                <h3>💪 Dane zdrowotne</h3>
+                <?php if (!empty($user['waga']) || !empty($user['wzrost']) || !empty($user['bmi'])): ?>
+                    <?php
+                        $computedBmi = null;
+                        if (!empty($user['waga']) && !empty($user['wzrost']) && is_numeric($user['waga']) && is_numeric($user['wzrost']) && (float)$user['wzrost'] > 0) {
+                            $computedBmi = (float)$user['waga'] / (((float)$user['wzrost'] / 100) ** 2);
+                        }
+                        $bmiDisplay = $computedBmi !== null ? number_format($computedBmi, 1, '.', '') : (!empty($user['bmi']) ? number_format((float)$user['bmi'], 1, '.', '') : '-');
+                    ?>
+                    <p><span class="label">Waga:</span><br><span class="value"><?php echo htmlspecialchars($user['waga'] ?? '-'); ?> kg</span></p>
+                    <p><span class="label">Wzrost:</span><br><span class="value"><?php echo htmlspecialchars($user['wzrost'] ?? '-'); ?> cm</span></p>
+                    <p><span class="label">BMI:</span><br><span class="value"><?php echo htmlspecialchars($bmiDisplay); ?></span></p>
+                <?php else: ?>
+                    <p class="value">Wprowadź wagę i wzrost, aby obliczyć BMI.</p>
+                <?php endif; ?>
+            </div>
+
+            <div class="profile-card">
+                <h3>📝 Opinia</h3>
+                <p class="value"><?php echo !empty($user['opinia']) ? nl2br(htmlspecialchars($user['opinia'])) : 'Brak opinii.'; ?></p>
+            </div>
+
+            <div class="profile-card karnety-section">
+                <h3>✍️ Edytuj profil</h3>
+                <?php if (!empty($profile_message)): ?>
+                    <div class="<?php echo $profile_message_type === 'success' ? 'success-message' : 'error-message'; ?>">
+                        <?php echo htmlspecialchars($profile_message); ?>
+                    </div>
+                <?php endif; ?>
+                <form method="POST" action="">
+                    <div class="profile-edit-grid">
+                        <?php
+                            $fieldMeta = [
+                                'imie' => ['label' => 'Imię', 'type' => 'text'],
+                                'nazwisko' => ['label' => 'Nazwisko', 'type' => 'text'],
+                                'mail' => ['label' => 'E-mail', 'type' => 'email'],
+                                'pesel' => ['label' => 'PESEL', 'type' => 'text'],
+                                'numer_telefonu' => ['label' => 'Numer telefonu', 'type' => 'text'],
+                                'miasto' => ['label' => 'Miasto', 'type' => 'text'],
+                                'ulica' => ['label' => 'Ulica', 'type' => 'text'],
+                                'numer_domu' => ['label' => 'Numer domu', 'type' => 'text'],
+                                'numer_lokalu' => ['label' => 'Numer lokalu', 'type' => 'text'],
+                                'kod_pocztowy' => ['label' => 'Kod pocztowy', 'type' => 'text'],
+                                'opinia' => ['label' => 'Opinia', 'type' => 'textarea'],
+                                'waga' => ['label' => 'Waga (kg)', 'type' => 'number', 'step' => '0.1'],
+                                'wzrost' => ['label' => 'Wzrost (cm)', 'type' => 'number', 'step' => '0.1'],
+                                'bmi' => ['label' => 'BMI', 'type' => 'number', 'step' => '0.1'],
+                            ];
+                            $blockedProfileFields = ['karnet_typ', 'karnet_zakup', 'karnet_koniec'];
+                            foreach ($selectCols as $col):
+                                if (in_array($col, ['id', 'role'], true) || in_array($col, $blockedProfileFields, true)) {
+                                    continue;
+                                }
+                                $meta = $fieldMeta[$col] ?? ['label' => ucfirst(str_replace('_', ' ', $col)), 'type' => 'text'];
+                                $value = $user[$col] ?? '';
+                                if ($col === 'bmi' && $value !== '') {
+                                    $value = number_format((float)$value, 1, '.', '');
+                                }
+                        ?>
+                            <div class="form-group">
+                                <label for="<?php echo htmlspecialchars($col); ?>"><?php echo htmlspecialchars($meta['label']); ?></label>
+                                <?php if ($meta['type'] === 'textarea'): ?>
+                                    <textarea id="<?php echo htmlspecialchars($col); ?>" name="<?php echo htmlspecialchars($col); ?>" rows="3"><?php echo htmlspecialchars($value); ?></textarea>
+                                <?php else: ?>
+                                    <input
+                                        type="<?php echo htmlspecialchars($meta['type']); ?>"
+                                        id="<?php echo htmlspecialchars($col); ?>"
+                                        name="<?php echo htmlspecialchars($col); ?>"
+                                        value="<?php echo htmlspecialchars($value); ?>"
+                                        <?php echo isset($meta['step']) ? 'step="' . htmlspecialchars($meta['step']) . '"' : ''; ?>
+                                    >
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="submit" class="submit-btn" style="margin-top: 10px;">Zapisz dane profilu</button>
+                </form>
+            </div>
+
+            <script>
+                function calculateBmi(weight, height) {
+                    if (!weight || !height || height <= 0) return '';
+                    return Math.round((weight / ((height / 100) ** 2)) * 10) / 10;
+                }
+
+                const profileWeight = document.getElementById('waga');
+                const profileHeight = document.getElementById('wzrost');
+                const profileBmi = document.getElementById('bmi');
+
+                if (profileWeight && profileHeight && profileBmi) {
+                    const updateProfileBmi = () => {
+                        const bmiValue = calculateBmi(parseFloat(profileWeight.value), parseFloat(profileHeight.value));
+                        profileBmi.value = bmiValue !== '' ? bmiValue.toFixed(1) : '';
+                    };
+                    profileWeight.addEventListener('input', updateProfileBmi);
+                    profileHeight.addEventListener('input', updateProfileBmi);
+                    updateProfileBmi();
+                }
+            </script>
+
+            <div class="profile-card karnety-section">
+                <h3>🎟️ Twoje Karnety</h3>
+                <?php if (count($karnety) > 0): ?>
+                    <div class="karnety-list">
+                        <?php foreach ($karnety as $karnet): ?>
+                            <div class="karnet-item">
+                                <h4><?php echo htmlspecialchars($karnet['typ_karnetu'] ?? 'Karnet'); ?></h4>
+                                <p><strong>Data ważności do:</strong> <?php echo date('d.m.Y', strtotime($karnet['data_konca'] ?? '')); ?></p>
+                                <p><strong>Dni pozostałe:</strong> <span style="color: #7a17cb; font-weight: bold;">
+                                    <?php echo ceil((strtotime($karnet['data_konca'] ?? '') - time()) / (60*60*24)); ?>
+                                </span></p>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-message">
+                        📭 Nie masz aktywnych karnetów. <a href="?page=karnety" style="color: #7a17cb; font-weight: bold; text-decoration: none;">Kup karnet →</a>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="action-buttons">
+                <a href="?page=karnety" class="btn btn-primary">💳 Kup Karnet</a>
+                <a href="?page=wylogowanie" class="btn btn-secondary">Wyloguj się</a>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="error-box">
+            <h2>⚠️ Nie można załadować profilu</h2>
+            <p><?php echo htmlspecialchars($error_msg); ?></p>
+            <p><strong>Próbuj:</strong></p>
+            <ul>
+                <li><a href="?page=logowanie">Zaloguj się ponownie</a></li>
+                <li><a href="?page=home">Powrót do strony głównej</a></li>
+            </ul>
+        </div>
+    <?php endif; ?>
+</div>
+
+
+
+
+regulamin.php ----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="regulamin-section">
+        <div class="regulamin-card">
+            <h2>1. Postanowienia ogólne</h2>
+            <p>1.1. Regulamin określa zasady korzystania z siłowni EnerGym, jej sprzętu oraz usług.</p>
+            <p>1.2. Przystąpienie do korzystania z siłowni oznacza akceptację niniejszego regulaminu.</p>
+            <p>1.3. Osoby korzystające z siłowni są zobowiązane do przestrzegania regulaminu, zaleceń personelu oraz zasad bezpieczeństwa.</p>
+        </div>
+        <div class="regulamin-card">
+            <h2>2. Zasady korzystania z siłowni</h2>
+            <ul>
+                <li>Posiadanie ważnego karnetu lub innych uprawnień do korzystania z usług siłowni.</li>
+                <li>Stan zdrowia umożliwiający bezpieczne korzystanie z urządzeń i zajęć.</li>
+            </ul>
+            <p>2.2. Osoby niepełnoletnie mogą korzystać z siłowni wyłącznie za zgodą opiekuna prawnego.</p>
+            <p>2.3. Obowiązuje strój sportowy i zmienne obuwie.</p>
+        </div>
+        <div class="regulamin-card">
+            <h2>3. Bezpieczeństwo i higiena</h2>
+            <ul>
+                <li>Zakaz przynoszenia alkoholu i narkotyków.</li>
+                <li>Obowiązek utrzymywania porządku i używania ręczników.</li>
+                <li>Zgłaszanie usterek sprzętu personelowi siłowni.</li>
+            </ul>
+        </div>
+        <div class="regulamin-card">
+            <h2>4. Zasady dotyczące płatności i karnetów</h2>
+            <ul>
+                <li>Karnety są imienne i nie można ich udostępniać osobom trzecim.</li>
+                <li>Ważność karnetu zgodnie z okresem zakupu.</li>
+                <li>Brak możliwości zwrotu środków za niewykorzystane wejścia.</li>
+            </ul>
+        </div>
+        <div class="regulamin-card">
+            <h2>5. Odpowiedzialność</h2>
+            <p>5.1. EnerGym nie ponosi odpowiedzialności za urazy wynikające z nieprzestrzegania zasad regulaminu.</p>
+            <p>5.2. Za zniszczenie sprzętu odpowiada sprawca.</p>
+        </div>
+        <div class="regulamin-card">
+            <h2>6. Postanowienia końcowe</h2>
+            <p>6.1. EnerGym zastrzega sobie prawo do zmiany regulaminu. O zmianach klienci zostaną poinformowani.</p>
+            <p>6.2. W przypadku pytań prosimy o kontakt z personelem siłowni.</p>
+        </div>
+    </div>
+
+
+
+rejestracja.php -----
+<?php
+// Rejestracja — tylko imię, nazwisko, e-mail i hasło
+$message = "";
+
+// Obsługa wysłania formularza
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Required fields
+    $imie = trim($_POST['imie'] ?? '');
+    $nazwisko = trim($_POST['nazwisko'] ?? '');
+    $mail = trim($_POST['mail'] ?? '');
+    $haslo = $_POST['haslo'] ?? '';
+
+    if (empty($imie) || empty($nazwisko) || empty($mail) || empty($haslo)) {
+        $message = "Imię, nazwisko, e-mail i hasło są wymagane!";
+    } else {
+        $hashed_password = password_hash($haslo, PASSWORD_DEFAULT);
+
+        // Escape
+        $imie_safe = mysqli_real_escape_string($conn, $imie);
+        $nazwisko_safe = mysqli_real_escape_string($conn, $nazwisko);
+        $mail_safe = mysqli_real_escape_string($conn, $mail);
+
+        $check_sql = "SELECT id FROM users WHERE mail = '$mail_safe'";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            $message = "Konto z takim adresem e-mail już istnieje!";
+        } else {
+            $sql = "INSERT INTO users (imie, nazwisko, mail, haslo) VALUES ('$imie_safe', '$nazwisko_safe', '$mail_safe', '$hashed_password')";
+
+            if (mysqli_query($conn, $sql)) {
+                header("Location: ?page=logowanie&msg=registered");
+                exit();
+            } else {
+                $errno = mysqli_errno($conn);
+                if ($errno === 1062) {
+                    $message = "Konto z takim adresem e-mail już istnieje!";
+                } else {
+                    $message = "Wystąpił błąd bazy danych. Spróbuj ponownie.";
+                }
+            }
+        }
+    }
+}
+?>
+
+<style>
+    .registration-container {
+        width: 33%;
+        min-width: 320px;
+        box-sizing: border-box;
+        margin: 60px auto;
+        padding: 40px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        border: 3px solid #7a17cb;
+    }
+
+    .registration-container h1 {
+        text-align: center;
+        color: #1a1a1a;
+        font-size: 32px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .registration-subtitle {
+        text-align: center;
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 30px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: #7a17cb;
+        background-color: #f5f0ff;
+        box-shadow: 0 0 10px rgba(122, 23, 203, 0.2);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #7a17cb 0%, #b45ed6 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(122, 23, 203, 0.4);
+    }
+
+    .submit-btn:active {
+        transform: translateY(0);
+    }
+
+    .error-message {
+        background-color: #ff6b6b;
+        color: white;
+        padding: 14px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #d63031;
+        font-weight: 500;
+    }
+
+    .success-message {
+        background-color: #51cf66;
+        color: white;
+        padding: 14px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #2f9e44;
+        font-weight: 500;
+    }
+
+    .login-link-section {
+        text-align: center;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 2px solid #eee;
+    }
+
+    .login-link-section p {
+        color: #666;
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .login-link-section a {
+        color: #7a17cb;
+        text-decoration: none;
+        font-weight: bold;
+        transition: color 0.3s ease;
+    }
+
+    .login-link-section a:hover {
+        color: #b45ed6;
+        text-decoration: underline;
+    }
+</style>
+
+<div class="registration-container">
+    <h1>🔐 Rejestracja</h1>
+    <p class="registration-subtitle">Dołącz do społeczności EnerGym i zacznij swoją przygodę!</p>
+
+    <?php if (!empty($message)): ?>
+        <?php if (strpos($message, 'wymaga') !== false || strpos($message, 'błąd') !== false || strpos($message, 'już') !== false): ?>
+            <div class="error-message"><?php echo $message; ?></div>
+        <?php else: ?>
+            <div class="success-message"><?php echo $message; ?></div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <form method="POST" action="">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+            <div class="form-group">
+                <label for="imie">✨ Imię</label>
+                <input type="text" id="imie" name="imie" placeholder="Wpisz swoje imię" value="<?php echo htmlspecialchars($_POST['imie'] ?? ''); ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label for="nazwisko">✨ Nazwisko</label>
+                <input type="text" id="nazwisko" name="nazwisko" placeholder="Wpisz swoje nazwisko" value="<?php echo htmlspecialchars($_POST['nazwisko'] ?? ''); ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label for="mail">📧 Adres E-mail</label>
+                <input type="email" id="mail" name="mail" placeholder="Wpisz swój e-mail" value="<?php echo htmlspecialchars($_POST['mail'] ?? ''); ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label for="haslo">🔑 Hasło</label>
+                <input type="password" id="haslo" name="haslo" placeholder="Wpisz bezpieczne hasło" required>
+            </div>
+        </div>
+
+        <div style="margin-top:16px">
+            <button type="submit" class="submit-btn">Załóż konto 💪</button>
+        </div>
+    </form>
+    
+    <div class="login-link-section">
+        <p>Masz już konto? <a href="?page=logowanie">Zaloguj się tutaj!</a></p>
+    </div>
+</div>
+
+
+
+transakcja.php -----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="form-container">
+        <form id="transaction-form">
+            <h2>Wprowadź swoje dane:</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email">Podaj e-mail</label>
+                    <input type="email" id="email" name="email" required placeholder="e-mail">
+                </div>
+                <div class="form-group">
+                    <label for="name">Podaj imię</label>
+                    <input type="text" id="name" name="name" required placeholder="imię">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="surname">Podaj nazwisko</label>
+                    <input type="text" id="surname" name="surname" required placeholder="nazwisko">
+                </div>
+                <div class="form-group">
+                    <label for="address">Podaj swój adres zamieszkania</label>
+                    <input type="text" id="address" name="address" required placeholder="adres">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="postalcode">Podaj kod pocztowy</label>
+                    <input type="text" id="postalcode" name="postalcode" required placeholder="kod pocztowy">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Podaj numer telefonu</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="numer telefonu">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label id="blik-label" for="blik">Wprowadź kod BLIK z aplikacji bankowej</label>
+                    <input type="text" id="blik" name="blik" required placeholder="Blik">
+                </div>
+            </div>
+
+            <button type="button" id="submit-btn" class="submit-btn">Zatwierdź transakcję</button>
+        </form>
+    </div>
+    
+    <div id="processing-message">Przetwarzanie transakcji. Proszę czekać...</div>
+    <div id="success-message">Transakcja przebiegła pomyślnie. Karnet zostanie przesłany na Twój e-mail. Dziękujemy za zakup.</div>
+
+    <script>
+        document.getElementById('submit-btn').addEventListener('click', function() {
+            document.getElementById('processing-message').style.display = 'block';
+            
+            document.getElementById('transaction-form').style.display = 'none';
+            
+            setTimeout(function() {
+                document.getElementById('processing-message').style.display = 'none';
+                document.getElementById('success-message').style.display = 'block';
+            }, 5000);
+
+            setTimeout(function() {
+                window.location.href = 'home';
+            }, 10000);
+        });
+    </script>
+
+
+
+
+trening_personalny.php -----
+<?php
+// Strona treningu personalnego z listą trenerów i odblokowaniem numeru telefonu.
+$trainers = [];
+if (isset($conn) && $conn) {
+    $trainerResult = mysqli_query($conn, "SHOW TABLES LIKE 'trenerzy'");
+    if ($trainerResult && mysqli_num_rows($trainerResult) > 0) {
+        $trainerQuery = mysqli_query($conn, "SELECT id, imie, nazwisko, specjalizacja, numer_telefonu, cena FROM trenerzy ORDER BY nazwisko ASC, imie ASC");
+        if ($trainerQuery) {
+            while ($row = mysqli_fetch_assoc($trainerQuery)) {
+                $trainers[] = $row;
+            }
+        }
+    }
+}
+?>
+
+<style>
+    .training-page {
+        max-width: 1100px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+    .training-hero {
+        background: linear-gradient(135deg, #5f2d91 0%, #ac4fc8 100%);
+        color: white;
+        padding: 38px 24px;
+        border-radius: 18px;
+        text-align: center;
+        box-shadow: 0 16px 35px rgba(95, 45, 145, 0.16);
+        margin-bottom: 35px;
+    }
+    .training-hero h1 {
+        font-size: 36px;
+        margin-bottom: 12px;
+    }
+    .training-hero p {
+        margin: 0 auto;
+        max-width: 760px;
+        font-size: 17px;
+        line-height: 1.7;
+        opacity: 0.95;
+    }
+    .trainer-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 22px;
+    }
+    .trainer-card {
+        background: #ffffff;
+        border-radius: 18px;
+        border: 1px solid #e8e6f1;
+        box-shadow: 0 18px 40px rgba(108, 83, 171, 0.08);
+        padding: 26px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .trainer-card h3 {
+        margin: 0 0 8px;
+        color: #2a1747;
+        font-size: 22px;
+    }
+    .trainer-card p {
+        margin: 8px 0;
+        color: #5e4a7b;
+        line-height: 1.6;
+    }
+    .trainer-card .detail {
+        font-weight: 600;
+        color: #3b2750;
+    }
+    .trainer-card .price {
+        font-size: 18px;
+        font-weight: 700;
+        margin-top: 12px;
+        color: #7c3aed;
+    }
+    .trainer-card button {
+        margin-top: 18px;
+        padding: 12px 18px;
+        border: none;
+        border-radius: 12px;
+        color: white;
+        background: #7c3aed;
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .trainer-card button:hover {
+        transform: translateY(-1px);
+        background: #5f27d4;
+    }
+    .trainer-card .phone-number {
+        margin-top: 12px;
+        font-size: 16px;
+        color: #2e1157;
+        display: none;
+        word-break: break-word;
+    }
+    .trainer-card .phone-number.visible {
+        display: block;
+    }
+    .training-empty {
+        background: #fff4e6;
+        border: 1px solid #ffd7a8;
+        color: #7a4a14;
+        padding: 22px;
+        border-radius: 16px;
+        text-align: center;
+    }
+</style>
+
+<div class="training-page">
+    <section class="training-hero">
+        <h1>Trening personalny</h1>
+        <p>Wybierz trenera personalnego dopasowanego do Twoich potrzeb i umów się na bezpośredni telefoniczny kontakt. Każdy trener został opisany, a numer telefonu wyświetlisz jednym kliknięciem.</p>
+    </section>
+
+    <?php if (!empty($trainers)): ?>
+        <div class="trainer-grid">
+            <?php foreach ($trainers as $trainer): ?>
+                <article class="trainer-card">
+                    <div>
+                        <h3><?php echo htmlspecialchars($trainer['nazwisko'] . ' ' . $trainer['imie']); ?></h3>
+                        <p class="detail">Specjalizacja: <?php echo htmlspecialchars($trainer['specjalizacja']); ?></p>
+                        <p class="price">Cena sesji: <?php echo number_format((float)$trainer['cena'], 2, ',', ' '); ?> zł</p>
+                    </div>
+                    <div>
+                        <button type="button" onclick="togglePhone(this)">Pokaż numer telefonu</button>
+                        <p class="phone-number"><?php echo htmlspecialchars($trainer['numer_telefonu'] ?? 'Brak numeru'); ?></p>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="training-empty">
+            <p>Aktualnie nie ma dostępnych trenerów personalnych w bazie danych. Spróbuj ponownie później lub skontaktuj się z nami bezpośrednio.</p>
+        </div>
+    <?php endif; ?>
+</div>
+
+<script>
+    function togglePhone(button) {
+        const card = button.closest('.trainer-card');
+        if (!card) return;
+        const phone = card.querySelector('.phone-number');
+        if (!phone) return;
+
+        phone.classList.toggle('visible');
+        button.textContent = phone.classList.contains('visible') ? 'Ukryj numer telefonu' : 'Pokaż numer telefonu';
+    }
+</script>
+
+
+
+
+wylogowanie.php -----
+<?php
+// Sprawdzenie czy użytkownik jest zalogowany
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ?page=home");
+    exit();
+}
+
+// Wylogowanie
+session_destroy();
+header("Location: ?page=home");
+exit();
+?>
+
+
+
+zajecia.php ----
+    <div class="logo-banner">
+        <img src="pic/logo_gym1.jpg" alt="Logo siłowni" class="logo-img">
+    </div>
+
+    <div class="naglowek">
+        <h1>Nasze Zajęcia</h1>
+    </div>
+
+    <div class="zajecia_section">
+        <div class="zajecia_card" style="background-image: url('pic/klub1.jpg');">
+            <h2>Yoga</h2>
+            <p>Relaksujące zajęcia dla każdego. Wzmacniają ciało i redukują stres.</p>
+            <button class="zajecia_button" onclick="openPopup('Yoga')">Zapisz się</button>
+        </div>
+        <div class="zajecia_card" style="background-image: url('pic/klub2.jpg');">
+            <h2>CrossFit</h2>
+            <p>Intensywne treningi siłowe i kondycyjne. Dla osób chcących wyzwania.</p>
+            <button class="zajecia_button" onclick="openPopup('CrossFit')">Zapisz się</button>
+        </div>
+        <div class="zajecia_card" style="background-image: url('pic/klub3.jpg');">
+            <h2>Zumba</h2>
+            <p>Połączenie tańca i fitnessu. Spal kalorie i baw się świetnie!</p>
+            <button class="zajecia_button" onclick="openPopup('Zumba')">Zapisz się</button>
+        </div>
+    </div>
+
+    <div id="popup-modal" class="popup-modal">
+        <div class="popup-content">
+            <h2 id="popup-title">Zapisz się na zajęcia</h2>
+            <button id="confirm-button" onclick="confirmPopup()">Potwierdź</button>
+            <p id="popup-success" class="popup-success" style="display: none;">
+                Aby zapisać się na zajęcia, skontaktuj się z EnerGym drogą telefoniczną (szczegóły w sekcji "kontakt").
+            </p>
+            <a id="contact-button" href="?page=kontakt" style="display: none;">
+                <button class="zajecia_button">Kontakt</button>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function openPopup(className) {
+            document.getElementById('popup-title').textContent = `Zapisz się na zajęcia: ${className}`;
+            document.getElementById('popup-modal').style.display = 'flex';
+            document.getElementById('confirm-button').style.display = 'inline-block';
+            document.getElementById('popup-success').style.display = 'none';
+            document.getElementById('contact-button').style.display = 'none';
+        }
+
+        function confirmPopup() {
+            const successMessage = document.getElementById('popup-success');
+            const contactButton = document.getElementById('contact-button');
+            const confirmButton = document.getElementById('confirm-button');
+
+            confirmButton.style.display = 'none';
+            successMessage.style.display = 'block';
+            contactButton.style.display = 'inline-block';
+
+            setTimeout(() => {
+                document.getElementById('popup-modal').style.display = 'none';
+            }, 10000);
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('popup-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    </script>
+
+
+
+
+
+------ TERAZ pliki nie w pages/ tylko po prostu w katalogu projektowym ----------------
+
+.htaccess -----
+DirectoryIndex index.php
+
+RewriteEngine On
+
+RewriteBase /gym-website-main/
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+RewriteRule ^([a-zA-Z0-9_-]+)$ index.php?page=$1 [L,QSA]
+
+
+footer.php------
+    <style>
+        html, body {
+            min-height: 100vh;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+        }
+        footer {
+            margin-top: auto;
+            width: 100%;
+        }
+    </style>
+    <footer>
+        <div class="footer-content">
+            <p>&copy; <?php echo date('Y'); ?> EnerGym</p>
+        </div>
+    </footer>
+</body>
+</html>
+
+
+
+header.php ------
+
+
+<?php
+    $pageTitle       = $pageTitle       ?? 'EnerGym';
+    $pageCss         = $pageCss         ?? 'silownia1.css';
+    $pageDescription = $pageDescription ?? '';
+    $pageHead        = $pageHead        ?? '';
+?>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="<?php echo htmlspecialchars($pageDescription); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars($pageTitle); ?></title>
+    <link rel="stylesheet" href="css/<?php echo htmlspecialchars($pageCss); ?>">
+    <?php echo $pageHead; ?>
+</head>
+<body>
+    <nav class="navbar">
+        <ul>
+            <li><a href="?page=home" class="pic"><img src="pic/logo_gym1.jpg" alt="Logo siłowni" style="height: 40px;"></a></li>
+            <li><a href="?page=karnety">Karnety</a></li>
+            <li><a href="?page=onas">O nas</a></li>
+            <li><a href="?page=kluby">Kluby</a></li>
+            <li><a href="?page=bmi">BMI</a></li>
+            <li><a href="?page=zajecia">Zajęcia</a></li>
+            <li><a href="?page=trening_personalny">Trening personalny</a></li>
+            <li><a href="?page=kontakt">Kontakt i FAQ</a></li>
+            <li><a href="?page=regulamin">Regulamin</a></li>
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <li class="nav-actions">
+                    <span style="color: #7a17cb; font-weight: bold; font-size: 16px; white-space: nowrap;">👤 <?php echo htmlspecialchars($_SESSION['imie']); ?><?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 1) ? ' (Admin)' : ''; ?></span>
+                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 1): ?>
+                        <a href="?page=admin">Panel Admina</a>
+                    <?php endif; ?>
+                    <a href="?page=profil">Mój Profil</a>
+                    <a href="?page=wylogowanie">Wyloguj</a>
+                </li>
+            <?php else: ?>
+                <li class="nav-actions">
+                    <a href="?page=rejestracja">Rejestracja</a>
+                    <a href="?page=logowanie">Logowanie</a>
+                </li>
+            <?php endif; ?>
+        </ul>
+    </nav>
+    <style>
+        .nav-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            white-space: nowrap;
+        }
+        .nav-actions a {
+            white-space: nowrap;
+        }
+    </style>
+
+
+
+index.php ------
+
+
+<?php
+    require_once __DIR__ . '/init.php'; // sesja + ciasteczka (przed wyslaniem HTML)
+
+    $permit = [
+        'home', 'karnety', 'onas', 'kluby', 'bmi',
+        'zajecia', 'kontakt', 'regulamin', 'transakcja', 
+        'rejestracja', 'logowanie', 'profil', 'wylogowanie',
+        'admin', 'admin_user_add', 'admin_user_edit', 'admin_user_delete',
+        'admin_trainer_add', 'admin_trainer_edit', 'admin_trainer_delete',
+        'trening_personalny'
+    ];
+
+    $page = $_GET['page'] ?? 'home';
+    if( !in_array($page, $permit, true) ) 
+    {
+        $page = 'home';
+    }
+
+    $meta = [
+        'home' => [
+            'title' => 'energym.com',
+            'css'   => 'silownia1.css',
+            'desc'  => 'EnerGym to sieć nowoczesnych siłowni w Krakowie. Oferujemy sprzęt najwyższej jakości, zajęcia grupowe, karnety dopasowane do Twoich potrzeb. Sprawdź naszą ofertę!',
+            'head'  => '<script src="js/silownia.js" defer></script>',
+        ],
+        'karnety' => [
+            'title' => 'Karnety w EnerGym',
+            'css'   => 'karnety.css',
+            'desc'  => 'Poznaj ofertę karnetów siłowni EnerGym: Basic, Standard, Premium. Dopasuj karnet do swoich potrzeb i korzystaj z naszych klubów fitness. Sprawdź ceny!',
+        ],
+        'onas' => [
+            'title' => 'O EnerGym',
+            'css'   => 'onas.css',
+            'desc'  => 'Poznaj historię EnerGym - nowoczesnych siłowni w Krakowie. Odkryj naszą misję, wartości i dołącz do społeczności fitness. Sprawdź więcej!',
+        ],
+        'kluby' => [
+            'title' => 'Nasze Kluby',
+            'css'   => 'kluby.css',
+            'desc'  => 'Poznaj nasze kluby fitness w Krakowie: SouthClub, EastClub i NorthClub. Oferujemy nowoczesny sprzęt, sale fitness, sauny oraz zajęcia grupowe. Sprawdź lokalizacje!',
+            'head'  =>
+                '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>' .
+                '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>' .
+                '<script src="js/silownia.js" defer></script>',
+        ],
+        'bmi' => [
+            'title' => 'Kalkulator BMI',
+            'css'   => 'bmi.css',
+            'desc'  => 'Skorzystaj z naszego kalkulatora BMI, aby łatwo obliczyć wskaźnik masy ciała. Dowiedz się, czy Twoja waga jest prawidłowa i poznaj kategorie BMI.',
+        ],
+        'zajecia' => [
+            'title' => 'Zajęcia w EnerGym',
+            'css'   => 'zajecia.css',
+            'desc'  => 'Odkryj zajęcia fitness w EnerGym: Yoga, CrossFit, Zumba i inne. Spal kalorie, wzmocnij ciało i baw się świetnie! Zapraszamy do zapisów.',
+        ],
+        'kontakt' => [
+            'title' => 'Kontakt EnerGym',
+            'css'   => 'kontakt.css',
+            'desc'  => 'Skontaktuj się z EnerGym! Oferujemy wsparcie w sprawach związanych z karnetami, zajęciami fitness, oraz pytaniami dotyczącymi siłowni. Sprawdź FAQ!',
+        ],
+        'regulamin' => [
+            'title' => 'Regulamin EnerGym',
+            'css'   => 'regulamin.css',
+            'desc'  => 'Sprawdź regulamin siłowni EnerGym w Krakowie. Zasady korzystania z usług fitness, karnetów oraz bezpieczeństwa. Zapraszamy do naszych klubów fitness.',
+        ],
+        'transakcja' => [
+            'title' => 'Panel płatności',
+            'css'   => 'transakcja.css',
+            'desc'  => 'Kup karnet na siłownię EnerGym online. Bezpieczne płatności BLIK i inne opcje. Wypełnij formularz i zacznij swoją przygodę z fitness już dziś!',
+        ],
+        'rejestracja' => [
+            'title' => 'Rejestracja - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zarejestruj się w EnerGym i dołącz do naszej społeczności fitness. Twórz konto, aby kupować karnety i śledzić swoje postępy. Darmowa rejestracja!',
+        ],
+        'logowanie' => [
+            'title' => 'Logowanie - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zaloguj się do swojego konta EnerGym. Zarządzaj swoimi karnetami, śledź postępy i korzystaj z ekskluywnych benefitów.',
+        ],
+        'profil' => [
+            'title' => 'Mój Profil - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Zarządzaj swoim profilem, przeglądaj aktywne karnety i historię transakcji.',
+        ],
+        'trening_personalny' => [
+            'title' => 'Trening personalny - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Poznaj naszych trenerów personalnych EnerGym i umów się na wizytę.',
+        ],
+        'admin' => [
+            'title' => 'Panel Administratora - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Administracja użytkownikami i trenerami EnerGym.',
+        ],
+        'admin_user_add' => [
+            'title' => 'Dodaj użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Dodaj nowego użytkownika do systemu.',
+        ],
+        'admin_user_edit' => [
+            'title' => 'Edytuj użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Edytuj dane użytkownika w systemie.',
+        ],
+        'admin_user_delete' => [
+            'title' => 'Usuń użytkownika - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Usuń użytkownika z bazy danych.',
+        ],
+        'admin_trainer_add' => [
+            'title' => 'Dodaj trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Dodaj nowego trenera do systemu.',
+        ],
+        'admin_trainer_edit' => [
+            'title' => 'Edytuj trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Edytuj dane trenera w systemie.',
+        ],
+        'admin_trainer_delete' => [
+            'title' => 'Usuń trenera - EnerGym',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Usuń trenera z bazy danych.',
+        ],
+        'wylogowanie' => [
+            'title' => 'Wylogowanie',
+            'css'   => 'silownia1.css',
+            'desc'  => 'Wylogowanie z konta.',
+        ],
+    ];
+
+    $m = $meta[$page] ?? $meta['home'];
+    $pageTitle       = $m['title'];
+    $pageCss         = $m['css'];
+    $pageDescription = $m['desc'];
+    $pageHead        = $m['head'] ?? '';
+
+    include __DIR__ . '/header.php';
+
+    $filePath = __DIR__ . '/pages/' . $page . '.php';
+    if( file_exists($filePath) ) 
+    {
+        include $filePath;
+    } 
+    else 
+    {
+        echo '<h1>Blad 404</h1><p>Strona o podanym adresie nie istnieje.</p>';
+    }
+
+    include __DIR__ . '/footer.php';
+?>
+
+
+
+init.php -------
+<?php
+    if( session_status() === PHP_SESSION_NONE ) 
+    {
+        session_start();
+    }
+
+    $poprzedniaWizyta = $_COOKIE['energym_ostatnia_wizyta'] ?? null;
+
+    setcookie(
+        'energym_ostatnia_wizyta',
+        date('Y-m-d H:i:s'),
+        [
+            'expires'  => time() + 60 * 60 * 24 * 30, // wazne 30 dni
+            'path'     => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]
+    );
+
+    $host = "localhost";
+    $user = "root";
+    $pass = "";
+    
+    $db_name = "silownia"; 
+
+    $conn = mysqli_connect($host, $user, $pass, $db_name);
+
+    if (!$conn) {
+        die("Błąd połączenia z bazą danych: " . mysqli_connect_error());
+    }
+?>
+
+
+
+silownia.sql ------
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: localhost
+-- Generation Time: Jun 05, 2026 at 12:46 AM
+-- Server version: 10.4.28-MariaDB
+-- PHP Version: 8.2.4
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `silownia`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `trenerzy`
+--
+
+CREATE TABLE `trenerzy` (
+  `id` int(11) NOT NULL,
+  `imie` varchar(50) NOT NULL,
+  `nazwisko` varchar(50) NOT NULL,
+  `specjalizacja` varchar(100) NOT NULL,
+  `cena` decimal(6,2) NOT NULL,
+  `numer_telefonu` varchar(15) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `trenerzy`
+--
+
+INSERT INTO `trenerzy` (`id`, `imie`, `nazwisko`, `specjalizacja`, `cena`, `numer_telefonu`) VALUES
+(7, 'Jakub123', 'Węż1', 'Korzykowka', 145.00, '100100100'),
+(8, 'Alina123', 'Karolina', 'Fitness', 150.00, '2002002200'),
+(9, 'Hello', 'World', 'Fitness', 200.00, '300400500'),
+(10, 'Peter1', 'Czech', 'Piilka', 400.00, '100200300');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `role` int(11) DEFAULT 0,
+  `imie` varchar(50) NOT NULL,
+  `nazwisko` varchar(50) NOT NULL,
+  `mail` varchar(100) NOT NULL,
+  `haslo` varchar(255) NOT NULL,
+  `pesel` varchar(11) DEFAULT NULL,
+  `numer_telefonu` varchar(15) DEFAULT NULL,
+  `miasto` varchar(50) DEFAULT NULL,
+  `ulica` varchar(50) DEFAULT NULL,
+  `numer_domu` varchar(10) DEFAULT NULL,
+  `numer_lokalu` varchar(10) DEFAULT NULL,
+  `kod_pocztowy` varchar(6) DEFAULT NULL,
+  `opinia` text DEFAULT NULL,
+  `karnet_typ` varchar(50) DEFAULT 'Brak',
+  `karnet_zakup` date DEFAULT NULL,
+  `karnet_koniec` date DEFAULT NULL,
+  `waga` decimal(5,2) DEFAULT NULL,
+  `wzrost` int(11) DEFAULT NULL,
+  `bmi` decimal(4,2) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `role`, `imie`, `nazwisko`, `mail`, `haslo`, `pesel`, `numer_telefonu`, `miasto`, `ulica`, `numer_domu`, `numer_lokalu`, `kod_pocztowy`, `opinia`, `karnet_typ`, `karnet_zakup`, `karnet_koniec`, `waga`, `wzrost`, `bmi`) VALUES
+(2, 1, 'Andrii1', 'Khomenko', 'akhom@gmail.com', '$2y$10$lV56eP0UKuN1jjNEwMWLtOZuvM0Kp4i.qkh6sspInN767tlMU1dim', '09252112783', NULL, NULL, 'Dobrego', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 80.00, 183, 23.90),
+(7, 0, 'Peter', 'Czech', 'pc@gmail.com', '$2y$10$6hWmFHjn5EtuW6X93VOB0uImL.xCvYZmU.D4ewGJn3Zjkaid6Ietu', '77021726158', NULL, 'Krakow', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(8, 0, 'Jakub1', 'Peter', 'jp@gmail.com', '$2y$10$TAfubFEH6CP703SmSL6vGuVylnTctDrq1jiQGi3dqIfL2t774lsSu', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Brak', NULL, NULL, NULL, NULL, NULL);
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `trenerzy`
+--
+ALTER TABLE `trenerzy`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `mail` (`mail`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `trenerzy`
+--
+ALTER TABLE `trenerzy`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+

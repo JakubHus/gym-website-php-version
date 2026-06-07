@@ -2,7 +2,7 @@ DirectoryIndex index.php
 
 RewriteEngine On
 
-RewriteBase /gym-website-main/
+RewriteBase /phpIAD/gym-website-main/
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

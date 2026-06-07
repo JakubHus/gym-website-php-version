@@ -27,32 +27,61 @@ $profile_message = "";
 $profile_message_type = "";
 
 $baseCols = ['id','imie','nazwisko','mail','role'];
-$optionalCols = ['pesel','numer_telefonu','miasto','ulica','numer_domu','numer_lokalu','kod_pocztowy','opinia','karnet_typ','karnet_zakup','karnet_koniec','waga','wzrost','bmi'];
+$optionalCols = ['pesel','numer_telefonu','miasto','ulica','numer_domu','numer_lokalu','kod_pocztowy','opinia','karnet_typ','karnet_zakup','karnet_koniec','waga','wzrost','bmi', 'ocena'];
+
+// Obsługa opinii
+if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['opinion_action'])) {
+    $action = $_POST['opinion_action'];
+    if ($action === 'save') {
+        $opiniaText = trim($_POST['opinia_text'] ?? '');
+        if (strlen($opiniaText) > 500) {
+            $opiniaText = substr($opiniaText, 0, 500);
+        }
+        $ocena = (int)($_POST['opinia_ocena'] ?? 5);
+        if ($ocena < 1) $ocena = 1;
+        if ($ocena > 5) $ocena = 5;
+        $opiniaSafe = mysqli_real_escape_string($conn, $opiniaText);
+        $sql = "UPDATE users SET opinia = '$opiniaSafe', ocena = $ocena WHERE id = '$user_id'";
+        mysqli_query($conn, $sql);
+    } elseif ($action === 'delete') {
+        $sql = "UPDATE users SET opinia = NULL, ocena = NULL WHERE id = '$user_id'";
+        mysqli_query($conn, $sql);
+    }
+    header("Location: ?page=profil");
+    exit();
+}
 
 // Obsługa zapisu profilu
-if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['opinion_action'])) {
     $pesel_input = trim($_POST['pesel'] ?? '');
     $pesel_valid = true;
     
     if ($pesel_input !== '') {
+        // Sprawdzenie czy ma 11 cyfr
         if (!preg_match('/^[0-9]{11}$/', $pesel_input)) {
             $pesel_valid = false;
         } else {
-            $digits = str_split($pesel_input);
-            $weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
-            $sum = 0;
-            foreach ($weights as $index => $weight) {
-                $sum += $weight * (int)$digits[$index];
-            }
-            $control = (10 - ($sum % 10)) % 10;
-            if ($control !== (int)$digits[10]) {
+            // WALIDACJA DATY URODZENIA (Zamiast rygorystycznej sumy kontrolnej)
+            $rok = (int)substr($pesel_input, 0, 2);
+            $miesiac = (int)substr($pesel_input, 2, 2);
+            $dzien = (int)substr($pesel_input, 4, 2);
+            
+            if ($miesiac >= 1 && $miesiac <= 12) { $rok += 1900; }
+            elseif ($miesiac >= 21 && $miesiac <= 32) { $rok += 2000; $miesiac -= 20; }
+            elseif ($miesiac >= 81 && $miesiac <= 92) { $rok += 1800; $miesiac -= 80; }
+            elseif ($miesiac >= 41 && $miesiac <= 52) { $rok += 2100; $miesiac -= 40; }
+            elseif ($miesiac >= 61 && $miesiac <= 72) { $rok += 2200; $miesiac -= 60; }
+            else { $pesel_valid = false; }
+            
+            // Sprawdzenie w kalendarzu czy taka data w ogóle istnieje
+            if ($pesel_valid && !checkdate($miesiac, $dzien, $rok)) {
                 $pesel_valid = false;
             }
         }
     }
 
     if (!$pesel_valid) {
-        $profile_message = "PESEL jest nieprawidłowy. Sprawdź sumę kontrolną i długość 11 cyfr.";
+        $profile_message = "Błędny PESEL. Upewnij się, że ma 11 cyfr i zawiera poprawną datę.";
         $profile_message_type = "error";
     } else {
         $mail_input = trim($_POST['mail'] ?? '');
@@ -79,9 +108,10 @@ if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['bmi'] = round((float)$waga_input / (((float)$wzrost_input / 100) ** 2), 1);
             }
 
+            $blockedFields = ['karnet_typ', 'karnet_zakup', 'karnet_koniec', 'opinia', 'ocena'];
             $updates = [];
             foreach ($updatedCols as $col) {
-                if ($col === 'role' || $col === 'id') {
+                if ($col === 'role' || $col === 'id' || in_array($col, $blockedFields, true)) {
                     continue;
                 }
 
@@ -158,11 +188,17 @@ if ($user && $conn) {
 
 <style>
     .profile-container {
-        width: 50%;
-        min-width: 320px;
+        width: 95%;
+        max-width: 900px;
         box-sizing: border-box;
         margin: 40px auto;
         padding: 0 20px;
+    }
+
+    .profile-edit-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
     }
 
     .debug-panel {
@@ -469,6 +505,112 @@ if ($user && $conn) {
         margin: 8px 0;
     }
 
+    .opinion-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    }
+
+    .opinion-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    .opinion-sheet {
+        position: fixed;
+        bottom: -100%;
+        left: 0;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 20px 20px 0 0;
+        z-index: 1000;
+        transition: bottom 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+        padding: 30px;
+        box-sizing: border-box;
+    }
+    .opinion-sheet.active {
+        bottom: 0;
+    }
+    .opinion-sheet-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .opinion-sheet-header h2 {
+        margin: 0;
+        color: #7a17cb;
+    }
+    .close-sheet {
+        background: none;
+        border: none;
+        font-size: 28px;
+        cursor: pointer;
+        color: #333;
+        font-weight: bold;
+    }
+    .opinion-textarea {
+        width: 100%;
+        height: 150px;
+        padding: 15px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        resize: none;
+        font-family: inherit;
+        font-size: 15px;
+        box-sizing: border-box;
+    }
+    .opinion-textarea:focus {
+        outline: none;
+        border-color: #7a17cb;
+        background: #f5f0ff;
+    }
+    .char-counter {
+        text-align: right;
+        font-size: 13px;
+        color: #666;
+        margin-top: 5px;
+    }
+    .sheet-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+        justify-content: flex-end;
+    }
+    .sheet-actions button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+    .btn-delete {
+        background: #ff6b6b;
+        color: white;
+    }
+    .btn-delete:hover {
+        background: #fa5252;
+    }
+
+    .star-rating-wrapper {
+    display: flex;
+    gap: 5px;
+    font-size: 28px;
+    color: #ccc;
+    cursor: pointer;
+    margin-right: auto;
+    margin-left: 20px;
+    user-select: none;
+    }
+    .star-rating-wrapper .star-btn.active {
+        color: #ffc107;
+    }
+
     @media (max-width: 768px) {
         .profile-grid {
             grid-template-columns: 1fr;
@@ -483,6 +625,106 @@ if ($user && $conn) {
         }
     }
 </style>
+
+<div class="opinion-overlay" id="opinionOverlay" onclick="closeOpinionSheet()"></div>
+<div class="opinion-sheet" id="opinionSheet">
+    <form method="POST" action="">
+        <div class="opinion-sheet-header">
+            <h2>Twoja opinia</h2>
+            <div class="star-rating-wrapper">
+                <span class="star-btn" data-value="1">★</span>
+                <span class="star-btn" data-value="2">★</span>
+                <span class="star-btn" data-value="3">★</span>
+                <span class="star-btn" data-value="4">★</span>
+                <span class="star-btn" data-value="5">★</span>
+                <input type="hidden" name="opinia_ocena" id="opinia_ocena" value="<?php echo htmlspecialchars($user['ocena'] ?? '5'); ?>">
+            </div>
+            <button type="button" class="close-sheet" onclick="closeOpinionSheet()">×</button>
+        </div>
+        <input type="hidden" name="opinion_action" value="save" id="opinionActionInput">
+        <textarea name="opinia_text" id="opinia_text" class="opinion-textarea" maxlength="500" placeholder="Napisz co myślisz o EnerGym..."><?php echo htmlspecialchars($user['opinia'] ?? ''); ?></textarea>
+        <div class="char-counter" id="charCounter">
+            <?php echo strlen($user['opinia'] ?? ''); ?> / 500
+        </div>
+        <div class="sheet-actions">
+            <?php if (!empty($user['opinia'])): ?>
+                <button type="submit" class="btn btn-delete" onclick="document.getElementById('opinionActionInput').value='delete'">Usuń</button>
+            <?php endif; ?>
+            <button type="submit" class="btn btn-primary" id="saveOpinionBtn" disabled>
+                <?php echo empty($user['opinia']) ? 'Dodaj opinię' : 'Zapisz'; ?>
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const opinionOverlay = document.getElementById('opinionOverlay');
+    const opinionSheet = document.getElementById('opinionSheet');
+    const opinionTextarea = document.getElementById('opinia_text');
+    const charCounter = document.getElementById('charCounter');
+    const saveOpinionBtn = document.getElementById('saveOpinionBtn');
+    const starBtns = document.querySelectorAll('.star-btn');
+    const opiniaOcenaInput = document.getElementById('opinia_ocena');
+    
+    let originalOpinion = opinionTextarea.value;
+    let originalRating = parseInt(opiniaOcenaInput.value) || 5;
+
+    function setStars(rating) {
+        starBtns.forEach(btn => {
+            if (parseInt(btn.getAttribute('data-value')) <= rating) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    starBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const val = parseInt(this.getAttribute('data-value'));
+            opiniaOcenaInput.value = val;
+            setStars(val);
+            checkOpinionChanges();
+        });
+    });
+
+    function openOpinionSheet() {
+        opinionOverlay.classList.add('active');
+        opinionSheet.classList.add('active');
+        originalOpinion = opinionTextarea.value;
+        originalRating = parseInt(opiniaOcenaInput.value) || 5;
+        setStars(originalRating);
+        checkOpinionChanges();
+    }
+
+    function closeOpinionSheet() {
+        opinionOverlay.classList.remove('active');
+        opinionSheet.classList.remove('active');
+    }
+
+    opinionTextarea.addEventListener('input', function() {
+        charCounter.textContent = this.value.length + ' / 500';
+        checkOpinionChanges();
+    });
+
+    function checkOpinionChanges() {
+        const currentRating = parseInt(opiniaOcenaInput.value) || 5;
+        if (originalOpinion !== '') {
+            if (opinionTextarea.value === originalOpinion && currentRating === originalRating) {
+                saveOpinionBtn.disabled = true;
+            } else {
+                saveOpinionBtn.disabled = false;
+            }
+        } else {
+            if (opinionTextarea.value.trim() === '') {
+                saveOpinionBtn.disabled = true;
+            } else {
+                saveOpinionBtn.disabled = false;
+            }
+        }
+    }
+</script>
+
 
 <div class="profile-container">
 <!-- <div class="debug-panel">
@@ -576,12 +818,38 @@ if ($user && $conn) {
 
             <div class="profile-card">
                 <h3>🎟️ Karnet</h3>
-                <?php if (!empty($user['karnet_typ']) || !empty($user['karnet_zakup']) || !empty($user['karnet_koniec'])): ?>
-                    <p><span class="label">Typ karnetu:</span><br><span class="value"><?php echo htmlspecialchars($user['karnet_typ'] ?? '-'); ?></span></p>
+                <?php if (!empty($user['karnet_typ']) && $user['karnet_typ'] !== 'Brak'): ?>
+                    <p><span class="label">Typ karnetu:</span><br><span class="value"><?php echo htmlspecialchars($user['karnet_typ']); ?></span></p>
                     <p><span class="label">Data zakupu:</span><br><span class="value"><?php echo !empty($user['karnet_zakup']) ? date('d.m.Y', strtotime($user['karnet_zakup'])) : '-'; ?></span></p>
                     <p><span class="label">Data końca:</span><br><span class="value"><?php echo !empty($user['karnet_koniec']) ? date('d.m.Y', strtotime($user['karnet_koniec'])) : '-'; ?></span></p>
+                    
+                    <?php if (strpos($user['karnet_typ'], 'Odnawialny') !== false): ?>
+                        <?php 
+                            $kwota = ($user['karnet_typ'] === 'Karnet Standard Odnawialny') ? '94.99 PLN' : '174.99 PLN';
+                            $zakup = new DateTime($user['karnet_zakup']);
+                            $now = new DateTime();
+                            $nextPayment = clone $zakup;
+                            while ($nextPayment <= $now) {
+                                $nextPayment->modify('+1 month');
+                            }
+                            $koniec = new DateTime($user['karnet_koniec']);
+                            $isPaidOff = $nextPayment > $koniec;
+                        ?>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                            <p><span class="label">Następna płatność:</span><br>
+                               <span class="value" style="color: #2d8f29; font-weight: bold;">
+                                   <?php echo $isPaidOff ? 'Opłacono w całości' : $nextPayment->format('d.m.Y'); ?>
+                               </span>
+                            </p>
+                            <?php if (!$isPaidOff): ?>
+                                <p><span class="label">Kwota pobrania:</span><br>
+                                   <span class="value" style="color: #2d8f29; font-weight: bold;"><?php echo $kwota; ?> / mies.</span>
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <p class="value">Brak karnetu.</p>
+                    <p class="value">Brak aktywnego karnetu.</p>
                     <p><a href="?page=karnety" style="color: #7a17cb; font-weight: bold; text-decoration: underline;">Sprawdź ofertę karnetów</a></p>
                 <?php endif; ?>
             </div>
@@ -607,6 +875,11 @@ if ($user && $conn) {
             <div class="profile-card">
                 <h3>📝 Opinia</h3>
                 <p class="value"><?php echo !empty($user['opinia']) ? nl2br(htmlspecialchars($user['opinia'])) : 'Brak opinii.'; ?></p>
+                <?php if (empty($user['opinia'])): ?>
+                    <button type="button" class="btn btn-primary" onclick="openOpinionSheet()" style="margin-top: 15px; width: 100%;">Dodaj opinię</button>
+                <?php else: ?>
+                    <button type="button" class="btn btn-secondary" onclick="openOpinionSheet()" style="margin-top: 15px; width: 100%;">Zobacz</button>
+                <?php endif; ?>
             </div>
 
             <div class="profile-card karnety-section">
@@ -635,7 +908,7 @@ if ($user && $conn) {
                                 'wzrost' => ['label' => 'Wzrost (cm)', 'type' => 'number', 'step' => '0.1'],
                                 'bmi' => ['label' => 'BMI', 'type' => 'number', 'step' => '0.1'],
                             ];
-                            $blockedProfileFields = ['karnet_typ', 'karnet_zakup', 'karnet_koniec'];
+                            $blockedProfileFields = ['karnet_typ', 'karnet_zakup', 'karnet_koniec', 'opinia', 'ocena'];
                             foreach ($selectCols as $col):
                                 if (in_array($col, ['id', 'role'], true) || in_array($col, $blockedProfileFields, true)) {
                                     continue;
@@ -685,27 +958,54 @@ if ($user && $conn) {
                     profileHeight.addEventListener('input', updateProfileBmi);
                     updateProfileBmi();
                 }
+
+                const phpMessages = document.querySelectorAll('.success-message, .error-message');
+                phpMessages.forEach(msg => {
+                    setTimeout(() => {
+                        msg.style.display = 'none';
+                    }, 3000);
+                });
+
+                const peselInput = document.getElementById('pesel');
+                if (peselInput) {
+                    const form = peselInput.closest('form');
+                    form.addEventListener('submit', function(e) {
+                        const peselVal = peselInput.value.trim();
+                        if (peselVal !== '' && !/^\d{11}$/.test(peselVal)) {
+                            e.preventDefault(); 
+                            
+                            let errorMsg = form.previousElementSibling;
+                            if (!errorMsg || (!errorMsg.classList.contains('error-message') && !errorMsg.classList.contains('success-message'))) {
+                                errorMsg = document.createElement('div');
+                                form.parentNode.insertBefore(errorMsg, form);
+                            }
+                            
+                            errorMsg.className = 'error-message';
+                            errorMsg.textContent = 'Błędny PESEL. Musi składać się z dokładnie 11 cyfr.';
+                            errorMsg.style.display = 'block';
+                            
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            
+                            setTimeout(() => {
+                                errorMsg.style.display = 'none';
+                            }, 3000);
+                        }
+                    });
+                }
             </script>
 
-            <div class="profile-card karnety-section">
-                <h3>🎟️ Twoje Karnety</h3>
-                <?php if (count($karnety) > 0): ?>
-                    <div class="karnety-list">
-                        <?php foreach ($karnety as $karnet): ?>
-                            <div class="karnet-item">
-                                <h4><?php echo htmlspecialchars($karnet['typ_karnetu'] ?? 'Karnet'); ?></h4>
-                                <p><strong>Data ważności do:</strong> <?php echo date('d.m.Y', strtotime($karnet['data_konca'] ?? '')); ?></p>
-                                <p><strong>Dni pozostałe:</strong> <span style="color: #7a17cb; font-weight: bold;">
-                                    <?php echo ceil((strtotime($karnet['data_konca'] ?? '') - time()) / (60*60*24)); ?>
-                                </span></p>
-                            </div>
-                        <?php endforeach; ?>
+
+            <?php if (empty($user['karnet_typ']) || $user['karnet_typ'] === 'Brak'): ?>
+                <div class="empty-message" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-top: 30px;">
+                    <div style="font-size: 16px; color: #333;">
+                        📭 Nie masz jeszcze aktywnego karnetu.
                     </div>
-                <?php else: ?>
-                    <div class="empty-message">
-                        📭 Nie masz aktywnych karnetów. <a href="?page=karnety" style="color: #7a17cb; font-weight: bold; text-decoration: none;">Kup karnet →</a>
-                    </div>
-                <?php endif; ?>
+                    <a href="?page=karnety" class="btn btn-primary">💳 Kup go tutaj!</a>
+                </div>
+            <?php endif; ?>
+
+            <div class="action-buttons" style="margin-top: 30px;">
+                <a href="?page=wylogowanie" class="btn btn-secondary" style="width: 100%; text-align: center; padding: 15px; box-sizing: border-box;">Wyloguj się</a>
             </div>
 
             <div class="action-buttons">
