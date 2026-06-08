@@ -57,24 +57,17 @@ if (isset($conn) && $conn && $_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_P
     $pesel_valid = true;
     
     if ($pesel_input !== '') {
-        // Sprawdzenie czy ma 11 cyfr
         if (!preg_match('/^[0-9]{11}$/', $pesel_input)) {
             $pesel_valid = false;
         } else {
-            // WALIDACJA DATY URODZENIA (Zamiast rygorystycznej sumy kontrolnej)
-            $rok = (int)substr($pesel_input, 0, 2);
-            $miesiac = (int)substr($pesel_input, 2, 2);
-            $dzien = (int)substr($pesel_input, 4, 2);
-            
-            if ($miesiac >= 1 && $miesiac <= 12) { $rok += 1900; }
-            elseif ($miesiac >= 21 && $miesiac <= 32) { $rok += 2000; $miesiac -= 20; }
-            elseif ($miesiac >= 81 && $miesiac <= 92) { $rok += 1800; $miesiac -= 80; }
-            elseif ($miesiac >= 41 && $miesiac <= 52) { $rok += 2100; $miesiac -= 40; }
-            elseif ($miesiac >= 61 && $miesiac <= 72) { $rok += 2200; $miesiac -= 60; }
-            else { $pesel_valid = false; }
-            
-            // Sprawdzenie w kalendarzu czy taka data w ogóle istnieje
-            if ($pesel_valid && !checkdate($miesiac, $dzien, $rok)) {
+            $digits = str_split($pesel_input);
+            $weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+            $sum = 0;
+            foreach ($weights as $index => $weight) {
+                $sum += $weight * (int)$digits[$index];
+            }
+            $control = (10 - ($sum % 10)) % 10;
+            if ($control !== (int)$digits[10]) {
                 $pesel_valid = false;
             }
         }

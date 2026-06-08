@@ -15,20 +15,17 @@ $user = null;
 $values = [];
 
 function is_valid_pesel($pesel) {
-    if (!preg_match('/^[0-9]{11}$/', $pesel)) return false;
-    
-    $rok = (int)substr($pesel, 0, 2);
-    $miesiac = (int)substr($pesel, 2, 2);
-    $dzien = (int)substr($pesel, 4, 2);
-    
-    if ($miesiac >= 1 && $miesiac <= 12) { $rok += 1900; }
-    elseif ($miesiac >= 21 && $miesiac <= 32) { $rok += 2000; $miesiac -= 20; }
-    elseif ($miesiac >= 81 && $miesiac <= 92) { $rok += 1800; $miesiac -= 80; }
-    elseif ($miesiac >= 41 && $miesiac <= 52) { $rok += 2100; $miesiac -= 40; }
-    elseif ($miesiac >= 61 && $miesiac <= 72) { $rok += 2200; $miesiac -= 60; }
-    else { return false; }
-    
-    return checkdate($miesiac, $dzien, $rok);
+    if (!preg_match('/^[0-9]{11}$/', $pesel)) {
+        return false;
+    }
+    $digits = str_split($pesel);
+    $weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+    $sum = 0;
+    foreach ($weights as $index => $weight) {
+        $sum += $weight * (int)$digits[$index];
+    }
+    $control = (10 - ($sum % 10)) % 10;
+    return $control === (int)$digits[10];
 }
 
 $result = mysqli_query($conn, "SELECT * FROM users WHERE id = $edit_id");
